@@ -370,7 +370,8 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
               <button
                 onClick={() => onGenerate({ inputs, results })}
                 disabled={!isFormValid}
-                className={`w-full text-white py-3 px-4 rounded-lg font-bold transition-colors mt-6 shadow-lg ${isFormValid ? 'bg-[#c0a068] hover:bg-[#b09058]' : 'bg-gray-400 cursor-not-allowed'}`}
+                title={!isFormValid ? "Wypełnij poprawnie wszystkie wymagane pola" : undefined}
+                className={`w-full text-white py-3 px-4 rounded-lg font-bold transition-colors mt-6 shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#c0a068]/50 ${isFormValid ? 'bg-[#c0a068] hover:bg-[#b09058]' : 'bg-gray-400 cursor-not-allowed'}`}
               >
                 Generuj Ofertę PDF
               </button>
