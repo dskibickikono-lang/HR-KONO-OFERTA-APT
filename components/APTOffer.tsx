@@ -11,9 +11,22 @@ interface Props {
 const APTOffer: React.FC<Props> = ({ data }) => {
   const { inputs, results } = data;
 
+  // Horyzont amortyzacji kosztów jednorazowych (guard zgodny z hookiem).
+  const horizon = inputs.contractHorizonMonths > 0 ? inputs.contractHorizonMonths : 1;
+  const oneTimeCosts = inputs.additionalCosts.filter(
+    cost => !cost.isPerMonth && cost.amountPerPerson > 0
+  );
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(value);
   };
+
+  // Guardy przed dzieleniem przez zero (MED-1): brak osób / godzin => '—'.
+  const totalHours = inputs.workerCount * inputs.hoursPerMonth;
+  const perPerson = (value: number) =>
+    inputs.workerCount > 0 ? formatCurrency(value / inputs.workerCount) : '—';
+  const perRbh = (value: number) =>
+    totalHours > 0 ? formatCurrency(value / totalHours) : '—';
 
   const formatDate = () => {
     const today = new Date();
@@ -88,39 +101,39 @@ const APTOffer: React.FC<Props> = ({ data }) => {
               <tr>
                 <td className="py-3 px-4 font-medium">Wynagrodzenie brutto pracowników</td>
                 <td className="py-3 px-4 text-right">{formatCurrency(results.gross)}</td>
-                <td className="py-3 px-4 text-right">{formatCurrency(results.gross / inputs.workerCount)}</td>
+                <td className="py-3 px-4 text-right">{perPerson(results.gross)}</td>
                 <td className="py-3 px-4 text-right">{formatCurrency(inputs.grossRateHourly)}</td>
               </tr>
               {results.zusTotal > 0 && (
                 <tr>
                   <td className="py-3 px-4 font-medium">ZUS i fundusze pracodawcy</td>
                   <td className="py-3 px-4 text-right">{formatCurrency(results.zusTotal)}</td>
-                  <td className="py-3 px-4 text-right">{formatCurrency(results.zusTotal / inputs.workerCount)}</td>
-                  <td className="py-3 px-4 text-right">{formatCurrency(results.zusTotal / (inputs.workerCount * inputs.hoursPerMonth))}</td>
+                  <td className="py-3 px-4 text-right">{perPerson(results.zusTotal)}</td>
+                  <td className="py-3 px-4 text-right">{perRbh(results.zusTotal)}</td>
                 </tr>
               )}
               {results.ppkAmount > 0 && (
                 <tr>
                   <td className="py-3 px-4 font-medium">PPK pracodawcy</td>
                   <td className="py-3 px-4 text-right">{formatCurrency(results.ppkAmount)}</td>
-                  <td className="py-3 px-4 text-right">{formatCurrency(results.ppkAmount / inputs.workerCount)}</td>
-                  <td className="py-3 px-4 text-right">{formatCurrency(results.ppkAmount / (inputs.workerCount * inputs.hoursPerMonth))}</td>
+                  <td className="py-3 px-4 text-right">{perPerson(results.ppkAmount)}</td>
+                  <td className="py-3 px-4 text-right">{perRbh(results.ppkAmount)}</td>
                 </tr>
               )}
               {inputs.contractType === 'Praca tymczasowa' && results.vacationReserve > 0 && (
                 <tr>
                   <td className="py-3 px-4 font-medium">Rezerwa urlopowa / koszty APT</td>
                   <td className="py-3 px-4 text-right">{formatCurrency(results.vacationReserve)}</td>
-                  <td className="py-3 px-4 text-right">{formatCurrency(results.vacationReserve / inputs.workerCount)}</td>
-                  <td className="py-3 px-4 text-right">{formatCurrency(results.vacationReserve / (inputs.workerCount * inputs.hoursPerMonth))}</td>
+                  <td className="py-3 px-4 text-right">{perPerson(results.vacationReserve)}</td>
+                  <td className="py-3 px-4 text-right">{perRbh(results.vacationReserve)}</td>
                 </tr>
               )}
 
               <tr className="bg-gray-50 font-bold border-t-2 border-gray-300">
                 <td className="py-3 px-4">KOSZT WŁASNY AGENCJI</td>
                 <td className="py-3 px-4 text-right">{formatCurrency(results.agencyCost)}</td>
-                <td className="py-3 px-4 text-right">{formatCurrency(results.agencyCost / inputs.workerCount)}</td>
-                <td className="py-3 px-4 text-right">{formatCurrency(results.agencyCost / (inputs.workerCount * inputs.hoursPerMonth))}</td>
+                <td className="py-3 px-4 text-right">{perPerson(results.agencyCost)}</td>
+                <td className="py-3 px-4 text-right">{perRbh(results.agencyCost)}</td>
               </tr>
 
               {getBilledAdditionalCosts().length > 0 && (
@@ -132,17 +145,28 @@ const APTOffer: React.FC<Props> = ({ data }) => {
               {/* Additional Billed Costs (Refaktury) */}
               {getBilledAdditionalCosts().map(cost => {
                 const isProject = cost.isProjectLevel;
-                const totalVal = isProject ? cost.amountPerPerson : cost.amountPerPerson * inputs.workerCount;
+                const baseVal = isProject ? cost.amountPerPerson : cost.amountPerPerson * inputs.workerCount;
+                // Koszt jednorazowy rozkładamy na horyzont kontraktu (HIGH-2),
+                // żeby pozycja na fakturze miesięcznej była wartością miesięczną.
+                const monthlyVal = cost.isPerMonth ? baseVal : baseVal / horizon;
+                // refaktura_z_marza jest fakturowana z marżą (monthly / marginFactor),
+                // więc pozycja zgadza się z WARTOŚĆ FAKTURY DLA KLIENTA. 1:1 = nominalnie.
+                const marginFactor = 1 - inputs.marginPercent / 100;
+                const billedVal =
+                  cost.mode === 'refaktura_z_marza' && marginFactor > 0
+                    ? monthlyVal / marginFactor
+                    : monthlyVal;
                 return (
                   <tr key={cost.id} className="text-gray-600">
                     <td className="py-3 px-4 pl-8">
                       {cost.label}
                       {cost.mode === 'refaktura_1do1' && ' (refaktura 1:1)'}
                       {cost.mode === 'refaktura_z_marza' && ' (refaktura z marżą)'}
+                      {!cost.isPerMonth && ` (jednorazowy, amortyzowany / ${horizon} mies.)`}
                     </td>
-                    <td className="py-3 px-4 text-right">{formatCurrency(totalVal)}</td>
-                    <td className="py-3 px-4 text-right">{formatCurrency(totalVal / inputs.workerCount)}</td>
-                    <td className="py-3 px-4 text-right">{formatCurrency(totalVal / (inputs.workerCount * inputs.hoursPerMonth))}</td>
+                    <td className="py-3 px-4 text-right">{formatCurrency(billedVal)}</td>
+                    <td className="py-3 px-4 text-right">{perPerson(billedVal)}</td>
+                    <td className="py-3 px-4 text-right">{perRbh(billedVal)}</td>
                   </tr>
                 );
               })}
@@ -150,7 +174,7 @@ const APTOffer: React.FC<Props> = ({ data }) => {
               <tr className="bg-[#396542]/10 font-bold text-lg border-t-2 border-gray-300">
                 <td className="py-4 px-4 text-[#396542]">WARTOŚĆ FAKTURY DLA KLIENTA</td>
                 <td className="py-4 px-4 text-right text-[#396542]">{formatCurrency(results.totalMonthlyBilling)}</td>
-                <td className="py-4 px-4 text-right text-[#396542]">{formatCurrency(results.totalMonthlyBilling / inputs.workerCount)}</td>
+                <td className="py-4 px-4 text-right text-[#396542]">{perPerson(results.totalMonthlyBilling)}</td>
                 <td className="py-4 px-4 text-right text-[#396542]"></td>
               </tr>
               <tr>
@@ -267,6 +291,37 @@ const APTOffer: React.FC<Props> = ({ data }) => {
                 </tr>
               </tbody>
             </table>
+
+            {oneTimeCosts.length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-sm font-bold mb-2 border-b border-gray-200 pb-1">
+                  Koszty jednorazowe — amortyzacja / {horizon} mies.
+                </h3>
+                <table className="w-full text-xs">
+                  <thead className="text-gray-500">
+                    <tr>
+                      <th className="py-1 text-left font-medium">Pozycja</th>
+                      <th className="py-1 text-right font-medium">Kwota jednorazowa</th>
+                      <th className="py-1 text-right font-medium">Mies. ({horizon} mc)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {oneTimeCosts.map(cost => {
+                      const raw = cost.isProjectLevel
+                        ? cost.amountPerPerson
+                        : cost.amountPerPerson * inputs.workerCount;
+                      return (
+                        <tr key={cost.id} className="text-gray-600">
+                          <td className="py-1">{cost.label}</td>
+                          <td className="py-1 text-right">{formatCurrency(raw)}</td>
+                          <td className="py-1 text-right">{formatCurrency(raw / horizon)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           <div>

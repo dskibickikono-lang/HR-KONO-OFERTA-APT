@@ -24,6 +24,7 @@ export interface APTInputs {
   hoursPerMonth: number;
   grossRateHourly: number;        // stawka brutto pracownika/h
   marginPercent: number;          // np. 18 (nie 0.18!)
+  contractHorizonMonths: number;  // horyzont amortyzacji kosztów jednorazowych, np. 3
   accidentInsuranceRate: number;  // wypadkowa % np. 1.67
   ppkEmployerRate: number;        // PPK pracodawcy % np. 1.5
   vacationReserveRate: number;    // rezerwa urlopowa % np. 8.3
@@ -69,11 +70,15 @@ export const useAPTCalculation = (inputs: APTInputs): APTResults => {
       hoursPerMonth,
       grossRateHourly,
       marginPercent,
+      contractHorizonMonths,
       accidentInsuranceRate,
       ppkEmployerRate,
       vacationReserveRate,
       additionalCosts
     } = inputs;
+
+    // Horyzont amortyzacji kosztów jednorazowych. Guard: <=0 / NaN => 1 (brak amortyzacji).
+    const horizon = contractHorizonMonths > 0 ? contractHorizonMonths : 1;
 
     const isExempt = contractorVariant !== 'Standard ozusowany';
     const gross = workerCount * hoursPerMonth * grossRateHourly;
@@ -102,6 +107,11 @@ export const useAPTCalculation = (inputs: APTInputs): APTResults => {
       let costValue = cost.amountPerPerson;
       if (!cost.isProjectLevel) {
         costValue *= workerCount;
+      }
+      // Koszt jednorazowy (isPerMonth=false) rozkładamy na horyzont kontraktu,
+      // żeby nie obciążał każdej miesięcznej faktury pełną kwotą (HIGH-2).
+      if (!cost.isPerMonth) {
+        costValue = costValue / horizon;
       }
 
       if (cost.mode === 'w_stawce') {

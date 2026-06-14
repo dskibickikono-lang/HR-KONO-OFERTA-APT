@@ -33,7 +33,10 @@ export const CostRow: React.FC<CostRowProps> = ({ cost, onChange }) => {
           min="0"
           step="0.01"
           value={cost.amountPerPerson}
-          onChange={(e) => onChange({ ...cost, amountPerPerson: Number(e.target.value) })}
+          onChange={(e) => {
+            const n = Number(e.target.value);
+            onChange({ ...cost, amountPerPerson: Number.isFinite(n) ? n : 0 });
+          }}
           className="w-full px-3 py-1.5 border border-gray-300 rounded text-right text-sm focus:ring-2 focus:ring-[#396542] outline-none"
         />
       </div>
