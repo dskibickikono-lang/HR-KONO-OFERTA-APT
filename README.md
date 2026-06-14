@@ -37,6 +37,40 @@ graph TD;
 
 ---
 
+## 📊 Calculation Architecture & Maths
+
+The core of the pricing model strictly adheres to HR-KONO conventions, where the margin is treated as a percentage of the final revenue, **not as a standard markup**.
+
+### 🔢 Margin Formula
+`Billed Amount = Cost / (1 - Margin Percentage)`
+
+### 🧩 Financial Data Flow
+
+```mermaid
+graph TD;
+    classDef gross fill:#dcfce7,stroke:#16a34a,stroke-width:2px;
+    classDef tax fill:#fecaca,stroke:#dc2626,stroke-width:2px;
+    classDef cost fill:#e2e8f0,stroke:#64748b,stroke-width:2px;
+    classDef agency fill:#fef08a,stroke:#ca8a04,stroke-width:2px;
+    classDef bill fill:#bfdbfe,stroke:#2563eb,stroke-width:2px;
+    classDef refaktura fill:#c4b5fd,stroke:#7c3aed,stroke-width:2px;
+
+    A[Gross Salary]:::gross --> E(Agency Cost);
+    Z[ZUS Employer]:::tax --> E;
+    P[PPK Employer]:::tax --> E;
+    V[Vacation Reserve]:::tax --> E;
+    I[Internal Costs 'w stawce']:::cost --> E;
+
+    E:::agency -->|Applied Math: Cost / 1 - Margin| B(Base Monthly Billing):::bill;
+
+    B --> T{Total Monthly Billing};
+
+    R1[Refaktura 1:1]:::refaktura --> T;
+    R2[Refaktura 'z marżą']:::refaktura -->|Applied Math: Refaktura / 1 - Margin| T;
+```
+
+---
+
 ## 🛠 Tech Stack
 
 - **Framework:** React 19
