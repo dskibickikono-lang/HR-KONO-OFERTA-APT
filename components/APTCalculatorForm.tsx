@@ -367,13 +367,28 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                 </div>
               </div>
 
-              <button
-                onClick={() => onGenerate({ inputs, results })}
-                disabled={!isFormValid}
-                className={`w-full text-white py-3 px-4 rounded-lg font-bold transition-colors mt-6 shadow-lg ${isFormValid ? 'bg-[#c0a068] hover:bg-[#b09058]' : 'bg-gray-400 cursor-not-allowed'}`}
-              >
-                Generuj Ofertę PDF
-              </button>
+              {(() => {
+                const hintId = 'generate-btn-hint';
+                return (
+                  <>
+                    <button
+                      onClick={() => onGenerate({ inputs, results })}
+                      disabled={!isFormValid}
+                      aria-disabled={!isFormValid}
+                      aria-describedby={!isFormValid ? hintId : undefined}
+                      title={!isFormValid ? "Wypełnij poprawnie wszystkie wymagane pola" : undefined}
+                      className={`w-full text-white py-3 px-4 rounded-lg font-bold transition-colors mt-6 shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#c0a068]/50 ${isFormValid ? 'bg-[#c0a068] hover:bg-[#b09058]' : 'bg-gray-400 cursor-not-allowed'}`}
+                    >
+                      Generuj Ofertę PDF
+                    </button>
+                    {!isFormValid && (
+                      <p id={hintId} className="mt-2 text-xs text-gray-500 text-center">
+                        Wypełnij poprawnie wszystkie wymagane pola
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Printer } from 'lucide-react';
 import { APTInputs, APTResults } from '../hooks/useAPTCalculation';
 
 interface Props {
@@ -218,9 +219,9 @@ const APTOffer: React.FC<Props> = ({ data }) => {
         <div className="mt-8 flex justify-center no-print">
           <button
             onClick={() => window.print()}
-            className="bg-[#c0a068] text-white px-8 py-3 rounded-lg font-bold shadow-lg hover:bg-[#b09058] transition-colors"
+            className="bg-[#c0a068] text-white px-8 py-3 rounded-lg font-bold shadow-lg hover:bg-[#b09058] active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#c0a068]/50 transition-all flex items-center gap-2"
           >
-            Drukuj / Zapisz PDF
+            <Printer className="w-5 h-5" /> Drukuj / Zapisz PDF
           </button>
         </div>
       </div>

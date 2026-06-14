@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import APTOffer from './components/APTOffer';
 import APTCalculatorForm from './components/APTCalculatorForm';
 import { APTInputs, APTResults } from './hooks/useAPTCalculation';
@@ -25,9 +26,10 @@ const App: React.FC = () => {
         <div className="relative">
           <button 
             onClick={() => setView('edit')}
-            className="fixed top-8 left-8 bg-slate-800 text-white px-6 py-2 rounded-full shadow-xl hover:bg-slate-700 transition-all z-50 print:hidden font-bold flex items-center gap-2"
+            aria-label="Wróć do edycji formularza"
+            className="fixed top-8 left-8 bg-slate-800 text-white px-6 py-2 rounded-full shadow-xl hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-400 transition-all z-50 print:hidden font-bold flex items-center gap-2"
           >
-            ← Wróć do edycji
+            <ArrowLeft className="w-5 h-5" /> Wróć do edycji
           </button>
           {data && <APTOffer data={data} />}
         </div>
