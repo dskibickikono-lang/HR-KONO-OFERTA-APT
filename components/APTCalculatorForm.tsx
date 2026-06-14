@@ -61,6 +61,15 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
     return new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(value);
   };
 
+  const isFormValid = inputs.workerCount >= 1 &&
+                      inputs.hoursPerMonth >= 0 &&
+                      inputs.grossRateHourly >= 0 &&
+                      inputs.marginPercent >= 0 &&
+                      inputs.accidentInsuranceRate >= 0 &&
+                      inputs.ppkEmployerRate >= 0 &&
+                      inputs.vacationReserveRate >= 0 &&
+                      inputs.additionalCosts.every(cost => cost.amountPerPerson >= 0);
+
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-8">
       <div className="flex items-center gap-3 mb-8 text-[#396542]">
@@ -140,18 +149,20 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                     min="1"
                     value={inputs.workerCount}
                     onChange={(e) => handleInputChange('workerCount', Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#396542] outline-none"
+                    className={`w-full px-3 py-2 border ${inputs.workerCount < 1 ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-[#396542] outline-none`}
                   />
+                  {inputs.workerCount < 1 && <span className="text-xs text-red-500">Min. 1 pracownik</span>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Godziny / mc / os.</label>
                   <input
                     type="number"
-                    min="1"
+                    min="0"
                     value={inputs.hoursPerMonth}
                     onChange={(e) => handleInputChange('hoursPerMonth', Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#396542] outline-none"
+                    className={`w-full px-3 py-2 border ${inputs.hoursPerMonth < 0 ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-[#396542] outline-none`}
                   />
+                  {inputs.hoursPerMonth < 0 && <span className="text-xs text-red-500">Nie może być mniejsze niż 0</span>}
                 </div>
               </div>
               <div>
@@ -162,8 +173,9 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                   min="0"
                   value={inputs.grossRateHourly}
                   onChange={(e) => handleInputChange('grossRateHourly', Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#396542] outline-none"
+                  className={`w-full px-3 py-2 border ${inputs.grossRateHourly < 0 ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-[#396542] outline-none`}
                 />
+                {inputs.grossRateHourly < 0 && <span className="text-xs text-red-500">Nie może być mniejsze niż 0</span>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Marża agencji %</label>
@@ -173,8 +185,9 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                   min="0"
                   value={inputs.marginPercent}
                   onChange={(e) => handleInputChange('marginPercent', Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#396542] outline-none"
+                  className={`w-full px-3 py-2 border ${inputs.marginPercent < 0 ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-[#396542] outline-none`}
                 />
+                {inputs.marginPercent < 0 && <span className="text-xs text-red-500">Nie może być mniejsza niż 0</span>}
               </div>
               <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -190,8 +203,9 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                   disabled={inputs.entity !== 'Inny'}
                   value={inputs.accidentInsuranceRate}
                   onChange={(e) => handleInputChange('accidentInsuranceRate', Number(e.target.value))}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#396542] outline-none ${inputs.entity !== 'Inny' ? 'bg-gray-100' : ''}`}
+                  className={`w-full px-3 py-2 border ${inputs.accidentInsuranceRate < 0 ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-[#396542] outline-none ${inputs.entity !== 'Inny' ? 'bg-gray-100' : ''}`}
                 />
+                {inputs.accidentInsuranceRate < 0 && <span className="text-xs text-red-500">Nie może być mniejsza niż 0</span>}
               </div>
             </div>
           </div>
@@ -211,8 +225,9 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                   min="0"
                   value={inputs.ppkEmployerRate}
                   onChange={(e) => handleInputChange('ppkEmployerRate', Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#396542] outline-none"
+                  className={`w-full px-3 py-2 border ${inputs.ppkEmployerRate < 0 ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-[#396542] outline-none`}
                 />
+                {inputs.ppkEmployerRate < 0 && <span className="text-xs text-red-500">Nie może być mniejsze niż 0</span>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Rezerwa urlopowa % (APT)</label>
@@ -223,8 +238,9 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                   value={inputs.vacationReserveRate}
                   onChange={(e) => handleInputChange('vacationReserveRate', Number(e.target.value))}
                   disabled={inputs.contractType !== 'Praca tymczasowa'}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#396542] outline-none ${inputs.contractType !== 'Praca tymczasowa' ? 'bg-gray-100 opacity-60' : ''}`}
+                  className={`w-full px-3 py-2 border ${inputs.vacationReserveRate < 0 ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-[#396542] outline-none ${inputs.contractType !== 'Praca tymczasowa' ? 'bg-gray-100 opacity-60' : ''}`}
                 />
+                {inputs.vacationReserveRate < 0 && <span className="text-xs text-red-500">Nie może być mniejsza niż 0</span>}
                 {inputs.contractType !== 'Praca tymczasowa' && (
                    <p className="text-xs text-gray-500 mt-1">Dostępne tylko dla "Praca tymczasowa"</p>
                 )}
@@ -323,7 +339,8 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
 
               <button
                 onClick={() => onGenerate({ inputs, results })}
-                className="w-full bg-[#c0a068] text-white py-3 px-4 rounded-lg font-bold hover:bg-[#b09058] transition-colors mt-6 shadow-lg"
+                disabled={!isFormValid}
+                className={`w-full text-white py-3 px-4 rounded-lg font-bold transition-colors mt-6 shadow-lg ${isFormValid ? 'bg-[#c0a068] hover:bg-[#b09058]' : 'bg-gray-400 cursor-not-allowed'}`}
               >
                 Generuj Ofertę PDF
               </button>

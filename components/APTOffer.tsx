@@ -116,13 +116,26 @@ const APTOffer: React.FC<Props> = ({ data }) => {
                 </tr>
               )}
 
-              {/* Additional Billed Costs */}
+              <tr className="bg-gray-50 font-bold border-t-2 border-gray-300">
+                <td className="py-3 px-4">KOSZT WŁASNY AGENCJI</td>
+                <td className="py-3 px-4 text-right">{formatCurrency(results.agencyCost)}</td>
+                <td className="py-3 px-4 text-right">{formatCurrency(results.agencyCost / inputs.workerCount)}</td>
+                <td className="py-3 px-4 text-right">{formatCurrency(results.agencyCost / (inputs.workerCount * inputs.hoursPerMonth))}</td>
+              </tr>
+
+              {getBilledAdditionalCosts().length > 0 && (
+                <tr className="bg-gray-100 font-bold border-t-2 border-gray-300">
+                  <td colSpan={4} className="py-3 px-4">REFAKTURY KOSZTÓW</td>
+                </tr>
+              )}
+
+              {/* Additional Billed Costs (Refaktury) */}
               {getBilledAdditionalCosts().map(cost => {
                 const isProject = cost.isProjectLevel;
                 const totalVal = isProject ? cost.amountPerPerson : cost.amountPerPerson * inputs.workerCount;
                 return (
                   <tr key={cost.id} className="text-gray-600">
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 pl-8">
                       {cost.label}
                       {cost.mode === 'refaktura_1do1' && ' (refaktura 1:1)'}
                       {cost.mode === 'refaktura_z_marza' && ' (refaktura z marżą)'}
@@ -134,14 +147,7 @@ const APTOffer: React.FC<Props> = ({ data }) => {
                 );
               })}
 
-              <tr className="bg-gray-50 font-bold border-t-2 border-gray-300">
-                <td className="py-3 px-4">KOSZT WŁASNY AGENCJI</td>
-                <td className="py-3 px-4 text-right">{formatCurrency(results.agencyCost)}</td>
-                <td className="py-3 px-4 text-right">{formatCurrency(results.agencyCost / inputs.workerCount)}</td>
-                <td className="py-3 px-4 text-right">{formatCurrency(results.agencyCost / (inputs.workerCount * inputs.hoursPerMonth))}</td>
-              </tr>
-
-              <tr className="bg-[#396542]/10 font-bold text-lg">
+              <tr className="bg-[#396542]/10 font-bold text-lg border-t-2 border-gray-300">
                 <td className="py-4 px-4 text-[#396542]">WARTOŚĆ FAKTURY DLA KLIENTA</td>
                 <td className="py-4 px-4 text-right text-[#396542]">{formatCurrency(results.totalMonthlyBilling)}</td>
                 <td className="py-4 px-4 text-right text-[#396542]">{formatCurrency(results.totalMonthlyBilling / inputs.workerCount)}</td>
