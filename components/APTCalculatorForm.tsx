@@ -68,6 +68,13 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
     return Number.isFinite(n) ? n : 0;
   };
 
+  // Guardy przed dzieleniem przez zero w podglądzie (MED-1).
+  const totalHours = inputs.workerCount * inputs.hoursPerMonth;
+  const perPerson = (value: number) =>
+    inputs.workerCount > 0 ? formatCurrency(value / inputs.workerCount) : '—';
+  const perRbh = (value: number) =>
+    totalHours > 0 ? formatCurrency(value / totalHours) : '—';
+
   const isFormValid = inputs.workerCount >= 1 &&
                       inputs.hoursPerMonth >= 0 &&
                       inputs.grossRateHourly >= 0 &&
@@ -338,22 +345,22 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                       <tr className="border-b border-white/10">
                         <td className="py-2 px-2">Brutto</td>
                         <td className="py-2 px-2 text-right">{formatCurrency(results.gross)}</td>
-                        <td className="py-2 px-2 text-right">{formatCurrency(results.gross / inputs.workerCount)}</td>
+                        <td className="py-2 px-2 text-right">{perPerson(results.gross)}</td>
                         <td className="py-2 px-2 text-right">{formatCurrency(inputs.grossRateHourly)}</td>
                       </tr>
                       {results.zusTotal > 0 && (
                         <tr className="border-b border-white/10">
                           <td className="py-2 px-2">ZUS</td>
                           <td className="py-2 px-2 text-right">{formatCurrency(results.zusTotal)}</td>
-                          <td className="py-2 px-2 text-right">{formatCurrency(results.zusTotal / inputs.workerCount)}</td>
-                          <td className="py-2 px-2 text-right">{formatCurrency(results.zusTotal / (inputs.workerCount * inputs.hoursPerMonth))}</td>
+                          <td className="py-2 px-2 text-right">{perPerson(results.zusTotal)}</td>
+                          <td className="py-2 px-2 text-right">{perRbh(results.zusTotal)}</td>
                         </tr>
                       )}
                        <tr className="border-b border-white/10">
                           <td className="py-2 px-2">Koszty APT</td>
                           <td className="py-2 px-2 text-right">{formatCurrency(results.internalCosts)}</td>
-                          <td className="py-2 px-2 text-right">{formatCurrency(results.internalCosts / inputs.workerCount)}</td>
-                          <td className="py-2 px-2 text-right">{formatCurrency(results.internalCosts / (inputs.workerCount * inputs.hoursPerMonth))}</td>
+                          <td className="py-2 px-2 text-right">{perPerson(results.internalCosts)}</td>
+                          <td className="py-2 px-2 text-right">{perRbh(results.internalCosts)}</td>
                         </tr>
                     </tbody>
                   </table>
