@@ -26,6 +26,7 @@ const App: React.FC = () => {
         <div className="relative">
           <button 
             onClick={() => setView('edit')}
+            aria-label="Wróć do edycji formularza"
             className="fixed top-8 left-8 bg-slate-800 text-white px-6 py-2 rounded-full shadow-xl hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-400 transition-all z-50 print:hidden font-bold flex items-center gap-2"
           >
             <ArrowLeft className="w-5 h-5" /> Wróć do edycji
