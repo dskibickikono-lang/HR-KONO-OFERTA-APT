@@ -1,31 +1,11 @@
 import React, { useState } from 'react';
-import Offer from './components/Offer';
-import CalculatorForm from './components/CalculatorForm';
+import APTOffer from './components/APTOffer';
+import APTCalculatorForm from './components/APTCalculatorForm';
+import { APTInputs, APTResults } from './hooks/useAPTCalculation';
 
 export type CalculationData = {
-  clientName: string;
-  entity: string; // Nowe pole
-  grossRate: number;
-  hours: number;
-  transportCost: number;
-  housingCost: number;
-  medicalExamCost: number;
-  bhpTrainingCost: number;
-  sanepidCost: number;
-  workClothingCost: number;
-  marginPercent: number;
-  accidentPercent: number; // Nowe pole
-  // Wyniki obliczeń
-  podstawaZus: number;
-  emerytalna: number;
-  rentowa: number;
-  wypadkowa: number;
-  fp: number;
-  fgsp: number;
-  marzaKwota: number;
-  finalMonthly: number;
-  finalHourly: number;
-  nettoWorker: number;
+  inputs: APTInputs;
+  results: APTResults;
 };
 
 const App: React.FC = () => {
@@ -40,7 +20,7 @@ const App: React.FC = () => {
   return (
     <div className="w-full min-h-screen bg-slate-50">
       {view === 'edit' ? (
-        <CalculatorForm onGenerate={handleGenerate} initialData={data} />
+        <APTCalculatorForm onGenerate={handleGenerate} initialData={data} />
       ) : (
         <div className="relative">
           <button 
@@ -49,7 +29,7 @@ const App: React.FC = () => {
           >
             ← Wróć do edycji
           </button>
-          <Offer data={data!} />
+          {data && <APTOffer data={data} />}
         </div>
       )}
     </div>
