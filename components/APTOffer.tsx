@@ -95,7 +95,7 @@ const APTOffer: React.FC<Props> = ({ data }) => {
                 <th className="py-3 px-4 text-left">Pozycja</th>
                 <th className="py-3 px-4 text-right w-32">Wartość miesięczna</th>
                 <th className="py-3 px-4 text-right w-32">Na osobę</th>
-                <th className="py-3 px-4 text-right w-32">Na RBH</th>
+                <th className="py-3 px-4 text-right w-32">Na rbh (roboczo-godz.)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -181,7 +181,7 @@ const APTOffer: React.FC<Props> = ({ data }) => {
               <tr>
                 <td colSpan={4} className="py-6 text-center">
                   <div className="inline-block border-2 border-[#c0a068] rounded-xl p-4 bg-[#c0a068]/10">
-                    <div className="text-sm text-gray-600 font-medium mb-1">STAWKA SPRZEDAŻOWA RBH</div>
+                    <div className="text-sm text-gray-600 font-medium mb-1">STAWKA SPRZEDAŻOWA rbh</div>
                     <div className="text-4xl font-bold text-[#c0a068]">
                       {formatCurrency(results.finalHourlyRate)}
                     </div>
@@ -349,15 +349,15 @@ const APTOffer: React.FC<Props> = ({ data }) => {
                 <h3 className="font-bold mb-4 text-[#396542]">MARŻA AGENCJI</h3>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Marża agencji %</span>
+                    <span className="text-gray-600">Marża (od kosztu własnego) %</span>
                     <span className="font-bold">{inputs.marginPercent}%</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Marża agencji zł/miesiąc</span>
+                    <span className="text-gray-600">Marża (od kosztu własnego) zł/miesiąc</span>
                     <span className="font-bold">{formatCurrency(results.marginAmount)}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Marża agencji zł/rbh</span>
+                    <span className="text-gray-600">Marża (od kosztu własnego) zł/rbh</span>
                     <span className="font-bold text-lg text-[#396542]">{formatCurrency(results.marginPerHour)}</span>
                   </div>
                 </div>

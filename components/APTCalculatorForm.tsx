@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useAPTCalculation, APTInputs, APTResults, AdditionalCost, Entity, ContractType, ContractorVariant } from '../hooks/useAPTCalculation';
+import { useAPTCalculation, calculateReverse, APTInputs, APTResults, AdditionalCost, Entity, ContractType, ContractorVariant } from '../hooks/useAPTCalculation';
 import { CostRow, COST_ROW_LAYOUT_CLASSES } from './CostRow';
-import { Building2, FileText, Calculator } from 'lucide-react';
+import { Building2, FileText, Calculator, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
+import { MARGIN_THRESHOLD_RISK, MARGIN_THRESHOLD_HEALTHY } from '../constants/business';
+import { HelpPopover } from './HelpPopover';
+import { HELP_CONTENT } from '../constants/helpContent';
 
 const DEFAULT_ADDITIONAL_COSTS: AdditionalCost[] = [
   { id: 'rekrutacja', label: 'Rekrutacja i onboarding / os.', amountPerPerson: 350, mode: 'w_stawce', isPerMonth: false },
@@ -36,6 +39,8 @@ const DEFAULT_INPUTS: APTInputs = {
 };
 
 const SESSION_STORAGE_KEY = 'apt_calc_session';
+const SESSION_ADVANCED_KEY = 'apt_calc_advanced_expanded';
+const SESSION_PRICING_MODE_KEY = 'apt_calc_pricing_mode';
 const SESSION_VERSION = 1;
 
 const validateAPTInputs = (data: any): data is APTInputs => {
@@ -81,6 +86,32 @@ const getInitialInputs = (initialData?: { inputs: APTInputs } | null): APTInputs
 
 const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
   const [inputs, setInputs] = useState<APTInputs>(getInitialInputs(initialData));
+  const [advancedExpanded, setAdvancedExpanded] = useState<boolean>(() => {
+    try {
+      const stored = sessionStorage.getItem(SESSION_ADVANCED_KEY);
+      return stored === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const [isReverseMode, setIsReverseMode] = useState<boolean>(() => {
+    try {
+      const stored = sessionStorage.getItem(SESSION_PRICING_MODE_KEY);
+      return stored === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [targetHourlyRate, setTargetHourlyRate] = useState<string>('');
+
+  useEffect(() => {
+    sessionStorage.setItem(SESSION_ADVANCED_KEY, String(advancedExpanded));
+  }, [advancedExpanded]);
+
+  useEffect(() => {
+    sessionStorage.setItem(SESSION_PRICING_MODE_KEY, String(isReverseMode));
+  }, [isReverseMode]);
 
   useEffect(() => {
     sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
@@ -90,6 +121,19 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
   }, [inputs]);
 
   const results = useAPTCalculation(inputs);
+
+  // Effect to perform reverse calculation
+  useEffect(() => {
+    if (isReverseMode && targetHourlyRate !== '') {
+      const target = Number(targetHourlyRate);
+      if (Number.isFinite(target) && target >= 0) {
+        const newGross = calculateReverse(inputs, target);
+        if (newGross !== inputs.grossRateHourly) {
+          setInputs(prev => ({ ...prev, grossRateHourly: newGross }));
+        }
+      }
+    }
+  }, [isReverseMode, targetHourlyRate, inputs, isReverseMode]);
 
   // Auto-set accident insurance rate when entity changes
   useEffect(() => {
@@ -131,9 +175,9 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
   const marginOfCostPercentage = results.agencyCost > 0 ? (results.marginAmount / results.agencyCost) * 100 : 0;
 
   let marginHealthConfig = { label: 'Uwaga', color: 'bg-yellow-500 text-black' };
-  if (marginOfCostPercentage < 8) {
+  if (marginOfCostPercentage < MARGIN_THRESHOLD_RISK) {
     marginHealthConfig = { label: 'Ryzyko', color: 'bg-red-500 text-white' };
-  } else if (marginOfCostPercentage > 12) {
+  } else if (marginOfCostPercentage > MARGIN_THRESHOLD_HEALTHY) {
     marginHealthConfig = { label: 'Zdrowa', color: 'bg-emerald-500 text-white' };
   }
 
@@ -152,6 +196,11 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
     sessionStorage.removeItem(SESSION_STORAGE_KEY);
     setInputs(DEFAULT_INPUTS);
   };
+
+  const hasOneTimeCost = inputs.additionalCosts.some(cost => !cost.isPerMonth && cost.amountPerPerson > 0);
+  const positionLower = inputs.position.toLowerCase();
+  const positionHasForeignKeywords = ['ukraina', 'ukrainiec', 'ukrainka', 'białoruś', 'cudzoziemiec', 'obcokrajowiec', 'zagraniczny'].some(keyword => positionLower.includes(keyword));
+  const legalCost = inputs.additionalCosts.find(c => c.id === 'legalizacja')?.amountPerPerson || 0;
 
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-8">
@@ -209,9 +258,18 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#396542] outline-none"
                   placeholder="np. Kompletacja zamówień"
                 />
+                {positionHasForeignKeywords && legalCost === 0 && (
+                  <div className="flex items-start gap-1 mt-1 text-yellow-600 text-xs">
+                    <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                    <span>Pole legalizacji wynosi 0 zł. Czy wszyscy pracownicy to obywatele polscy?</span>
+                  </div>
+                )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Typ kalkulacji</label>
+                <div className="flex items-center mb-1">
+                  <label className="block text-sm font-medium text-gray-700">Typ kalkulacji</label>
+                  <HelpPopover title={HELP_CONTENT.contractType.title} content={HELP_CONTENT.contractType.content} />
+                </div>
                 <select
                   value={inputs.contractType}
                   onChange={(e) => handleInputChange('contractType', e.target.value as ContractType)}
@@ -222,7 +280,10 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Wariant zleceniobiorcy</label>
+                <div className="flex items-center mb-1">
+                  <label className="block text-sm font-medium text-gray-700">Wariant zleceniobiorcy</label>
+                  <HelpPopover title={HELP_CONTENT.contractorVariant.title} content={HELP_CONTENT.contractorVariant.content} />
+                </div>
                 <select
                   value={inputs.contractorVariant}
                   onChange={(e) => handleInputChange('contractorVariant', e.target.value as ContractorVariant)}
@@ -232,6 +293,25 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                   <option value="Student do 26 lat">Student do 26 lat</option>
                   <option value="Zbieg tytułów - bez społecznych">Zbieg tytułów - bez społecznych</option>
                 </select>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">Tryb kalkulacji stawki</label>
+                  <div className="flex bg-gray-100 rounded-lg p-1">
+                    <button
+                      onClick={() => setIsReverseMode(false)}
+                      className={`px-3 py-1 text-sm rounded-md transition-colors ${!isReverseMode ? 'bg-white shadow-sm font-semibold text-[#396542]' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                      Od pracownika
+                    </button>
+                    <button
+                      onClick={() => setIsReverseMode(true)}
+                      className={`px-3 py-1 text-sm rounded-md transition-colors ${isReverseMode ? 'bg-white shadow-sm font-semibold text-[#396542]' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                      Od klienta (Reverse)
+                    </button>
+                  </div>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -246,7 +326,7 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                   {inputs.workerCount < 1 && <span className="text-xs text-red-500">Min. 1 pracownik</span>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Godziny / mc / os.</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Godziny / miesiąc / osoba</label>
                   <input
                     type="number"
                     min="0"
@@ -255,22 +335,64 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                     className={`w-full px-3 py-2 border ${inputs.hoursPerMonth < 0 ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-[#396542] outline-none`}
                   />
                   {inputs.hoursPerMonth < 0 && <span className="text-xs text-red-500">Nie może być mniejsze niż 0</span>}
+                  {inputs.hoursPerMonth >= 0 && (inputs.hoursPerMonth < 40 || inputs.hoursPerMonth > 240) && (
+                    <div className="flex items-start gap-1 mt-1 text-yellow-600 text-xs">
+                      <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                      <span>Wartość poza typowym zakresem (40–240 h). Czy to poprawne?</span>
+                    </div>
+                  )}
                 </div>
               </div>
+              {isReverseMode ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="flex items-center mb-1">
+                      <label className="block text-sm font-medium text-[#c0a068]">Docelowa stawka klienta / h</label>
+                      <HelpPopover title={HELP_CONTENT.grossRateHourly.title} content={HELP_CONTENT.grossRateHourly.content} />
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={targetHourlyRate}
+                      onChange={(e) => setTargetHourlyRate(e.target.value)}
+                      className="w-full px-3 py-2 border border-[#c0a068] rounded-md focus:ring-2 focus:ring-[#396542] outline-none bg-[#c0a068]/5"
+                      placeholder="np. 50.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-1">Stawka brutto (wyliczona)</label>
+                    <input
+                      type="number"
+                      value={inputs.grossRateHourly}
+                      readOnly
+                      disabled
+                      className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-500 cursor-not-allowed"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="flex items-center mb-1">
+                    <label className="block text-sm font-medium text-gray-700">Stawka brutto pracownika / h</label>
+                    <HelpPopover title={HELP_CONTENT.grossRateHourly.title} content={HELP_CONTENT.grossRateHourly.content} />
+                  </div>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={inputs.grossRateHourly}
+                    onChange={(e) => handleInputChange('grossRateHourly', toNumber(e.target.value))}
+                    className={`w-full px-3 py-2 border ${inputs.grossRateHourly < 0 ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-[#396542] outline-none`}
+                  />
+                  {inputs.grossRateHourly < 0 && <span className="text-xs text-red-500">Nie może być mniejsze niż 0</span>}
+                </div>
+              )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Stawka brutto pracownika / h</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={inputs.grossRateHourly}
-                  onChange={(e) => handleInputChange('grossRateHourly', toNumber(e.target.value))}
-                  className={`w-full px-3 py-2 border ${inputs.grossRateHourly < 0 ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-[#396542] outline-none`}
-                />
-                {inputs.grossRateHourly < 0 && <span className="text-xs text-red-500">Nie może być mniejsze niż 0</span>}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Marża agencji %</label>
+                <div className="flex items-center mb-1">
+                  <label className="block text-sm font-medium text-gray-700">Marża (od kosztu własnego) %</label>
+                  <HelpPopover title={HELP_CONTENT.marginPercent.title} content={HELP_CONTENT.marginPercent.content} />
+                </div>
                 <input
                   type="number"
                   step="0.1"
@@ -283,12 +405,15 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                 {inputs.marginPercent >= 100 && <span className="text-xs text-red-500">Marża od wartości sprzedaży musi być &lt; 100%</span>}
               </div>
               <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Składka wypadkowa %
-                  {inputs.entity !== 'Inny' && (
-                    <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">AUTO</span>
-                  )}
-                </label>
+                <div className="flex items-center mb-1">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Składka wypadkowa %
+                    {inputs.entity !== 'Inny' && (
+                      <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">AUTO</span>
+                    )}
+                  </label>
+                  <HelpPopover title={HELP_CONTENT.accidentInsuranceRate.title} content={HELP_CONTENT.accidentInsuranceRate.content} />
+                </div>
                 <input
                   type="number"
                   step="0.01"
@@ -303,15 +428,42 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
             </div>
           </div>
 
-          {/* Parametry APT */}
+          {/* Parametry pracodawcy */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <Calculator className="w-5 h-5 text-[#c0a068]" />
-              Parametry APT
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div
+              className="flex items-center justify-between cursor-pointer select-none"
+              onClick={() => setAdvancedExpanded(!advancedExpanded)}
+            >
+              <div className="flex items-center gap-2">
+                <Calculator className="w-5 h-5 text-[#c0a068]" />
+                <h2 className="text-xl font-semibold">Parametry pracodawcy</h2>
+                {(!advancedExpanded && (
+                  inputs.ppkEmployerRate !== DEFAULT_INPUTS.ppkEmployerRate ||
+                  inputs.vacationReserveRate !== DEFAULT_INPUTS.vacationReserveRate ||
+                  inputs.contractHorizonMonths !== DEFAULT_INPUTS.contractHorizonMonths
+                )) && (
+                  <span className="ml-2 w-2 h-2 rounded-full bg-yellow-500" title="Zmieniono wartości domyślne" />
+                )}
+              </div>
+              <div className="flex items-center gap-4">
+                {!advancedExpanded && (
+                  <div className="hidden md:flex text-sm text-gray-500 gap-4">
+                    <span>PPK: {inputs.ppkEmployerRate}%</span>
+                    <span>Urlop: {inputs.vacationReserveRate}%</span>
+                    <span>Horyzont: {inputs.contractHorizonMonths} mc</span>
+                  </div>
+                )}
+                {advancedExpanded ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+              </div>
+            </div>
+
+            {advancedExpanded && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">PPK pracodawcy %</label>
+                <div className="flex items-center mb-1">
+                  <label className="block text-sm font-medium text-gray-700">PPK pracodawcy %</label>
+                  <HelpPopover title={HELP_CONTENT.ppkEmployerRate.title} content={HELP_CONTENT.ppkEmployerRate.content} />
+                </div>
                 <input
                   type="number"
                   step="0.1"
@@ -339,7 +491,10 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Horyzont kontraktu (miesiące)</label>
+                <div className="flex items-center mb-1">
+                  <label className="block text-sm font-medium text-gray-700">Horyzont kontraktu (miesiące)</label>
+                  <HelpPopover title={HELP_CONTENT.contractHorizonMonths.title} content={HELP_CONTENT.contractHorizonMonths.content} />
+                </div>
                 <input
                   type="number"
                   step="1"
@@ -350,8 +505,15 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                 />
                 <p className="text-xs text-gray-500 mt-1">Koszty jednorazowe rozkładane na tę liczbę miesięcy</p>
                 {inputs.contractHorizonMonths < 1 && <span className="text-xs text-red-500">Min. 1 miesiąc</span>}
+                {inputs.contractHorizonMonths > 0 && inputs.contractHorizonMonths <= 2 && hasOneTimeCost && (
+                  <div className="flex items-start gap-1 mt-1 text-yellow-600 text-xs">
+                    <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                    <span>Krótki horyzont znacząco podwyższa stawkę godzinową przez wysoką amortyzację kosztów jednorazowych.</span>
+                  </div>
+                )}
               </div>
             </div>
+            )}
           </div>
 
           {/* Section 2: Koszty dodatkowe */}
@@ -416,7 +578,7 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                 </div>
                 <div className="flex justify-between items-center border-b border-white/10 pb-2">
                   <div className="flex flex-col">
-                    <span className="opacity-80 text-sm">Marża (od kosztu)</span>
+                    <span className="opacity-80 text-sm">Marża (od kosztu własnego)</span>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-xl font-bold text-white">{marginOfCostPercentage.toFixed(2)}%</span>
                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider ${marginHealthConfig.color}`}>
@@ -444,7 +606,7 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                         <th className="py-2 px-2 text-left">Pozycja</th>
                         <th className="py-2 px-2 text-right">Łącznie</th>
                         <th className="py-2 px-2 text-right">Na osobę</th>
-                        <th className="py-2 px-2 text-right">Na RBH</th>
+                        <th className="py-2 px-2 text-right">Na rbh (roboczo-godz.)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -462,12 +624,39 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                           <td className="py-2 px-2 text-right">{perRbh(results.zusTotal)}</td>
                         </tr>
                       )}
-                       <tr className="border-b border-white/10">
-                          <td className="py-2 px-2">Koszty APT</td>
-                          <td className="py-2 px-2 text-right">{formatCurrency(results.internalCosts)}</td>
-                          <td className="py-2 px-2 text-right">{perPerson(results.internalCosts)}</td>
-                          <td className="py-2 px-2 text-right">{perRbh(results.internalCosts)}</td>
+                      {results.ppkAmount > 0 && (
+                        <tr className="border-b border-white/10 text-white/70">
+                          <td className="py-2 px-2 pl-4">└ PPK</td>
+                          <td className="py-2 px-2 text-right">{formatCurrency(results.ppkAmount)}</td>
+                          <td className="py-2 px-2 text-right">{perPerson(results.ppkAmount)}</td>
+                          <td className="py-2 px-2 text-right">{perRbh(results.ppkAmount)}</td>
                         </tr>
+                      )}
+                      {results.vacationReserve > 0 && (
+                        <tr className="border-b border-white/10 text-white/70">
+                          <td className="py-2 px-2 pl-4">└ Urlop</td>
+                          <td className="py-2 px-2 text-right">{formatCurrency(results.vacationReserve)}</td>
+                          <td className="py-2 px-2 text-right">{perPerson(results.vacationReserve)}</td>
+                          <td className="py-2 px-2 text-right">{perRbh(results.vacationReserve)}</td>
+                        </tr>
+                      )}
+                      {inputs.additionalCosts
+                        .filter(cost => cost.amountPerPerson > 0 && cost.mode !== 'po_stronie_klienta')
+                        .map(cost => {
+                          const horizon = inputs.contractHorizonMonths > 0 ? inputs.contractHorizonMonths : 1;
+                          let costValueTotal = cost.amountPerPerson;
+                          if (!cost.isProjectLevel) costValueTotal *= inputs.workerCount;
+                          if (!cost.isPerMonth) costValueTotal /= horizon;
+
+                          return (
+                            <tr key={cost.id} className="border-b border-white/10 text-white/70">
+                              <td className="py-2 px-2 pl-4">└ {cost.label.split(' /')[0]}</td>
+                              <td className="py-2 px-2 text-right">{formatCurrency(costValueTotal)}</td>
+                              <td className="py-2 px-2 text-right">{perPerson(costValueTotal)}</td>
+                              <td className="py-2 px-2 text-right">{perRbh(costValueTotal)}</td>
+                            </tr>
+                          );
+                        })}
                     </tbody>
                   </table>
                 </div>
