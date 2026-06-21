@@ -181,7 +181,7 @@ const APTOffer: React.FC<Props> = ({ data }) => {
               <tr>
                 <td colSpan={4} className="py-6 text-center">
                   <div className="inline-block border-2 border-[#c0a068] rounded-xl p-4 bg-[#c0a068]/10">
-                    <div className="text-sm text-gray-600 font-medium mb-1">STAWKA SPRZEDAŻOWA rbh</div>
+                    <div className="text-sm text-gray-600 font-medium mb-1">STAWKA SPRZEDAŻOWA rbh (roboczo-godz.)</div>
                     <div className="text-4xl font-bold text-[#c0a068]">
                       {formatCurrency(results.finalHourlyRate)}
                     </div>

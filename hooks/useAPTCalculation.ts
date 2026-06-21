@@ -55,6 +55,14 @@ export interface APTResults {
   marginAmount: number;
   marginPerHour: number;
   workerNetto: number;
+  additionalCostBreakdown: {
+    id: string;
+    label: string;
+    monthlyTotal: number;
+    perPerson: number;
+    perRbh: number;
+    billedMonthlyTotal: number;
+  }[];
 }
 
 export const round2 = (num: number): number => {
@@ -96,11 +104,16 @@ export const calculateForward = (inputs: APTInputs): APTResults => {
   // Rezerwa urlopowa - TYLKO dla Praca tymczasowa
   const vacationReserve = contractType === 'Praca tymczasowa' ? (gross * vacationReserveRate) / 100 : 0;
 
+  // Stawka bazowa (marża od wartości sprzedaży)
+  const marginFactor = 1 - marginPercent / 100;
+  const totalHours = workerCount * hoursPerMonth;
+
   // Koszty dodatkowe wliczone w stawkę (mode = 'w_stawce')
   let internalCosts = 0;
   let refakturaZMarzaTotal = 0;
   let refaktura1to1Total = 0;
   const clientSideCosts: AdditionalCost[] = [];
+  const additionalCostBreakdown: APTResults['additionalCostBreakdown'] = [];
 
   additionalCosts.forEach(cost => {
     let costValue = cost.amountPerPerson;
@@ -122,15 +135,28 @@ export const calculateForward = (inputs: APTInputs): APTResults => {
     } else if (cost.mode === 'po_stronie_klienta') {
       clientSideCosts.push(cost);
     }
+
+    if (cost.amountPerPerson > 0 && cost.mode !== 'po_stronie_klienta') {
+      let billedMonthlyTotal = costValue;
+      if (cost.mode === 'refaktura_z_marza' && marginFactor > 0) {
+        billedMonthlyTotal = costValue / marginFactor;
+      }
+
+      additionalCostBreakdown.push({
+        id: cost.id,
+        label: cost.label,
+        monthlyTotal: round2(costValue),
+        perPerson: workerCount > 0 ? round2(costValue / workerCount) : 0,
+        perRbh: totalHours > 0 ? round2(billedMonthlyTotal / totalHours) : 0,
+        billedMonthlyTotal: round2(billedMonthlyTotal),
+      });
+    }
   });
 
   // Koszt własny agencji
   const agencyCost = gross + zusTotal + ppkAmount + vacationReserve + internalCosts;
 
-  // Stawka bazowa (marża od wartości sprzedaży)
-  const marginFactor = 1 - marginPercent / 100;
   const baseMonthlyBilling = marginFactor > 0 ? agencyCost / marginFactor : 0;
-  const totalHours = workerCount * hoursPerMonth;
   const baseHourlyRate = totalHours > 0 ? baseMonthlyBilling / totalHours : 0;
 
   // Refaktury z marżą
@@ -171,6 +197,7 @@ export const calculateForward = (inputs: APTInputs): APTResults => {
     marginAmount: round2(marginAmount),
     marginPerHour: round2(marginPerHour),
     workerNetto: round2(workerNetto),
+    additionalCostBreakdown,
   };
 };
 

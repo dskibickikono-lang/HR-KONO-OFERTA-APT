@@ -120,20 +120,15 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
     }));
   }, [inputs]);
 
-  const results = useAPTCalculation(inputs);
+  // Compute the derived gross rate synchronously
+  let displayGrossRate = inputs.grossRateHourly;
+  const parsedTarget = Number(targetHourlyRate);
+  if (isReverseMode && targetHourlyRate !== '' && Number.isFinite(parsedTarget) && parsedTarget >= 0) {
+    displayGrossRate = calculateReverse(inputs, parsedTarget);
+  }
 
-  // Effect to perform reverse calculation
-  useEffect(() => {
-    if (isReverseMode && targetHourlyRate !== '') {
-      const target = Number(targetHourlyRate);
-      if (Number.isFinite(target) && target >= 0) {
-        const newGross = calculateReverse(inputs, target);
-        if (newGross !== inputs.grossRateHourly) {
-          setInputs(prev => ({ ...prev, grossRateHourly: newGross }));
-        }
-      }
-    }
-  }, [isReverseMode, targetHourlyRate, inputs, isReverseMode]);
+  // Use the derived gross rate for calculations
+  const results = useAPTCalculation({ ...inputs, grossRateHourly: displayGrossRate });
 
   // Auto-set accident insurance rate when entity changes
   useEffect(() => {
@@ -299,7 +294,12 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                   <label className="block text-sm font-medium text-gray-700">Tryb kalkulacji stawki</label>
                   <div className="flex bg-gray-100 rounded-lg p-1">
                     <button
-                      onClick={() => setIsReverseMode(false)}
+                      onClick={() => {
+                        if (isReverseMode) {
+                          setInputs(prev => ({ ...prev, grossRateHourly: displayGrossRate }));
+                        }
+                        setIsReverseMode(false);
+                      }}
                       className={`px-3 py-1 text-sm rounded-md transition-colors ${!isReverseMode ? 'bg-white shadow-sm font-semibold text-[#396542]' : 'text-gray-500 hover:text-gray-700'}`}
                     >
                       Od pracownika
@@ -364,7 +364,7 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                     <label className="block text-sm font-medium text-gray-500 mb-1">Stawka brutto (wyliczona)</label>
                     <input
                       type="number"
-                      value={inputs.grossRateHourly}
+                      value={displayGrossRate}
                       readOnly
                       disabled
                       className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-500 cursor-not-allowed"
@@ -640,23 +640,14 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                           <td className="py-2 px-2 text-right">{perRbh(results.vacationReserve)}</td>
                         </tr>
                       )}
-                      {inputs.additionalCosts
-                        .filter(cost => cost.amountPerPerson > 0 && cost.mode !== 'po_stronie_klienta')
-                        .map(cost => {
-                          const horizon = inputs.contractHorizonMonths > 0 ? inputs.contractHorizonMonths : 1;
-                          let costValueTotal = cost.amountPerPerson;
-                          if (!cost.isProjectLevel) costValueTotal *= inputs.workerCount;
-                          if (!cost.isPerMonth) costValueTotal /= horizon;
-
-                          return (
-                            <tr key={cost.id} className="border-b border-white/10 text-white/70">
-                              <td className="py-2 px-2 pl-4">└ {cost.label.split(' /')[0]}</td>
-                              <td className="py-2 px-2 text-right">{formatCurrency(costValueTotal)}</td>
-                              <td className="py-2 px-2 text-right">{perPerson(costValueTotal)}</td>
-                              <td className="py-2 px-2 text-right">{perRbh(costValueTotal)}</td>
-                            </tr>
-                          );
-                        })}
+                      {results.additionalCostBreakdown.map(cost => (
+                        <tr key={cost.id} className="border-b border-white/10 text-white/70">
+                          <td className="py-2 px-2 pl-4">└ {cost.label.split(' /')[0]}</td>
+                          <td className="py-2 px-2 text-right">{formatCurrency(cost.billedMonthlyTotal)}</td>
+                          <td className="py-2 px-2 text-right">{perPerson(cost.billedMonthlyTotal)}</td>
+                          <td className="py-2 px-2 text-right">{formatCurrency(cost.perRbh)}</td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
