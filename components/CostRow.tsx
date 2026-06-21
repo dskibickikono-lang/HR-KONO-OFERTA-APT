@@ -20,14 +20,22 @@ const MODE_COLORS: Record<CostMode, string> = {
   'po_stronie_klienta': 'bg-gray-100 text-gray-800',
 };
 
+export const COST_ROW_LAYOUT_CLASSES = {
+  container: 'flex items-center gap-4',
+  label: 'flex-1',
+  amount: 'w-32',
+  mode: 'w-48',
+  status: 'w-32',
+};
+
 export const CostRow: React.FC<CostRowProps> = ({ cost, onChange }) => {
   return (
-    <div className="flex items-center gap-4 py-2 border-b border-gray-100 last:border-0">
-      <div className="flex-1">
+    <div className={`${COST_ROW_LAYOUT_CLASSES.container} py-2 border-b border-gray-100 last:border-0`}>
+      <div className={COST_ROW_LAYOUT_CLASSES.label}>
         <label className="text-sm font-medium text-gray-700">{cost.label}</label>
       </div>
 
-      <div className="w-32">
+      <div className={COST_ROW_LAYOUT_CLASSES.amount}>
         <input
           type="number"
           min="0"
@@ -41,7 +49,7 @@ export const CostRow: React.FC<CostRowProps> = ({ cost, onChange }) => {
         />
       </div>
 
-      <div className="w-48 relative">
+      <div className={`${COST_ROW_LAYOUT_CLASSES.mode} relative`}>
         <select
           value={cost.mode}
           onChange={(e) => onChange({ ...cost, mode: e.target.value as CostMode })}
@@ -53,7 +61,7 @@ export const CostRow: React.FC<CostRowProps> = ({ cost, onChange }) => {
         </select>
       </div>
 
-      <div className="w-32 flex justify-end">
+      <div className={`${COST_ROW_LAYOUT_CLASSES.status} flex justify-end`}>
         <span className={`px-2 py-1 text-xs font-medium rounded-full ${MODE_COLORS[cost.mode]} whitespace-nowrap`}>
           {MODE_LABELS[cost.mode]}
         </span>
