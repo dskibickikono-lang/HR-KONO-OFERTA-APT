@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAPTCalculation, APTInputs, APTResults, AdditionalCost, Entity, ContractType, ContractorVariant } from '../hooks/useAPTCalculation';
-import { CostRow } from './CostRow';
+import { CostRow, COST_ROW_LAYOUT_CLASSES } from './CostRow';
 import { Building2, FileText, Calculator } from 'lucide-react';
 
 const DEFAULT_ADDITIONAL_COSTS: AdditionalCost[] = [
@@ -18,23 +18,76 @@ interface Props {
   initialData?: { inputs: APTInputs, results: APTResults } | null;
 }
 
+const DEFAULT_INPUTS: APTInputs = {
+  entity: 'HR KONO S.A.',
+  clientName: '',
+  position: '',
+  contractType: 'Umowa zlecenie',
+  contractorVariant: 'Standard ozusowany',
+  workerCount: 1,
+  hoursPerMonth: 168,
+  grossRateHourly: 31.40,
+  marginPercent: 18,
+  contractHorizonMonths: 3,
+  accidentInsuranceRate: 1.20,
+  ppkEmployerRate: 1.5,
+  vacationReserveRate: 8.3,
+  additionalCosts: DEFAULT_ADDITIONAL_COSTS,
+};
+
+const SESSION_STORAGE_KEY = 'apt_calc_session';
+const SESSION_VERSION = 1;
+
+const validateAPTInputs = (data: any): data is APTInputs => {
+  if (!data || typeof data !== 'object') return false;
+
+  // Basic structural validation to ensure it's a valid APTInputs object
+  const requiredKeys: (keyof APTInputs)[] = [
+    'entity', 'clientName', 'position', 'contractType', 'contractorVariant',
+    'workerCount', 'hoursPerMonth', 'grossRateHourly', 'marginPercent',
+    'contractHorizonMonths', 'accidentInsuranceRate', 'ppkEmployerRate',
+    'vacationReserveRate', 'additionalCosts'
+  ];
+
+  for (const key of requiredKeys) {
+    if (!(key in data)) return false;
+  }
+
+  if (typeof data.workerCount !== 'number' || typeof data.clientName !== 'string') return false;
+  if (!Array.isArray(data.additionalCosts)) return false;
+
+  return true;
+};
+
+const getInitialInputs = (initialData?: { inputs: APTInputs } | null): APTInputs => {
+  if (initialData?.inputs) return initialData.inputs;
+  try {
+    const stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (
+        parsed &&
+        parsed.version === SESSION_VERSION &&
+        validateAPTInputs(parsed.data)
+      ) {
+        return parsed.data;
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to parse session storage, falling back to defaults.');
+  }
+  return DEFAULT_INPUTS;
+};
+
 const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
-  const [inputs, setInputs] = useState<APTInputs>(initialData?.inputs || {
-    entity: 'HR KONO S.A.',
-    clientName: '',
-    position: '',
-    contractType: 'Umowa zlecenie',
-    contractorVariant: 'Standard ozusowany',
-    workerCount: 1,
-    hoursPerMonth: 168,
-    grossRateHourly: 31.40,
-    marginPercent: 18,
-    contractHorizonMonths: 3,
-    accidentInsuranceRate: 1.20,
-    ppkEmployerRate: 1.5,
-    vacationReserveRate: 8.3,
-    additionalCosts: DEFAULT_ADDITIONAL_COSTS,
-  });
+  const [inputs, setInputs] = useState<APTInputs>(getInitialInputs(initialData));
+
+  useEffect(() => {
+    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
+      version: SESSION_VERSION,
+      data: inputs
+    }));
+  }, [inputs]);
 
   const results = useAPTCalculation(inputs);
 
@@ -75,6 +128,15 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
   const perRbh = (value: number) =>
     totalHours > 0 ? formatCurrency(value / totalHours) : '—';
 
+  const marginOfCostPercentage = results.agencyCost > 0 ? (results.marginAmount / results.agencyCost) * 100 : 0;
+
+  let marginHealthConfig = { label: 'Uwaga', color: 'bg-yellow-500 text-black' };
+  if (marginOfCostPercentage < 8) {
+    marginHealthConfig = { label: 'Ryzyko', color: 'bg-red-500 text-white' };
+  } else if (marginOfCostPercentage > 12) {
+    marginHealthConfig = { label: 'Zdrowa', color: 'bg-emerald-500 text-white' };
+  }
+
   const isFormValid = inputs.workerCount >= 1 &&
                       inputs.hoursPerMonth >= 0 &&
                       inputs.grossRateHourly >= 0 &&
@@ -86,11 +148,25 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                       inputs.vacationReserveRate >= 0 &&
                       inputs.additionalCosts.every(cost => cost.amountPerPerson >= 0);
 
+  const handleReset = () => {
+    sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    setInputs(DEFAULT_INPUTS);
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-8">
-      <div className="flex items-center gap-3 mb-8 text-[#396542]">
-        <Building2 className="w-8 h-8" />
-        <h1 className="text-3xl font-bold">Kalkulator APT</h1>
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-3 text-[#396542]">
+          <Building2 className="w-8 h-8" />
+          <h1 className="text-3xl font-bold">Kalkulator APT</h1>
+        </div>
+        <button
+          onClick={handleReset}
+          className="text-sm text-gray-500 hover:text-gray-800 underline decoration-gray-300 underline-offset-4 transition-colors"
+          title="Przywróć wartości domyślne"
+        >
+          Resetuj kalkulator
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -284,6 +360,12 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
               <FileText className="w-5 h-5 text-[#c0a068]" />
               Koszty dodatkowe
             </h2>
+            <div className={`${COST_ROW_LAYOUT_CLASSES.container} py-2 mb-2 border-b-2 border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider`}>
+              <div className={COST_ROW_LAYOUT_CLASSES.label}>Nazwa kosztu</div>
+              <div className={`${COST_ROW_LAYOUT_CLASSES.amount} text-right pr-2`}>Kwota (PLN)</div>
+              <div className={COST_ROW_LAYOUT_CLASSES.mode}>Sposób rozliczenia</div>
+              <div className={`${COST_ROW_LAYOUT_CLASSES.status} text-right pr-2`}>Status</div>
+            </div>
             <div className="space-y-2">
               {inputs.additionalCosts.map(cost => (
                 <CostRow key={cost.id} cost={cost} onChange={handleCostChange} />
@@ -300,6 +382,17 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
               Podsumowanie
             </h2>
 
+            {(inputs.clientName || inputs.position) && (
+              <div className="mb-6 pb-4 border-b border-white/20">
+                {inputs.clientName && (
+                  <div className="font-medium text-lg leading-tight mb-1">{inputs.clientName}</div>
+                )}
+                {inputs.position && (
+                  <div className="text-sm text-[#c0a068] opacity-90">{inputs.position}</div>
+                )}
+              </div>
+            )}
+
             <div className="space-y-6">
               <div className="bg-white/10 p-4 rounded-lg">
                 <div className="text-sm opacity-80 mb-1">Stawka godzinowa (dla klienta)</div>
@@ -313,15 +406,28 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                   <span className="opacity-80 text-sm">Łączna wartość faktury / mc</span>
                   <span className="font-semibold">{formatCurrency(results.totalMonthlyBilling)}</span>
                 </div>
+                <div className="flex justify-between items-center border-b border-white/10 pb-2 text-[#c0a068]">
+                  <span className="opacity-90 text-sm">Wartość kontraktu</span>
+                  <span className="font-bold">{formatCurrency(results.totalMonthlyBilling * inputs.contractHorizonMonths)}</span>
+                </div>
                 <div className="flex justify-between items-center border-b border-white/10 pb-2">
                   <span className="opacity-80 text-sm">Koszt własny agencji / mc</span>
                   <span className="font-semibold">{formatCurrency(results.agencyCost)}</span>
                 </div>
                 <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                  <span className="opacity-80 text-sm">Marża</span>
-                  <span className="font-semibold text-[#c0a068]">
-                    {formatCurrency(results.marginAmount)} / {formatCurrency(results.marginPerHour)}/rbh
-                  </span>
+                  <div className="flex flex-col">
+                    <span className="opacity-80 text-sm">Marża (od kosztu)</span>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xl font-bold text-white">{marginOfCostPercentage.toFixed(2)}%</span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider ${marginHealthConfig.color}`}>
+                        {marginHealthConfig.label}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right flex flex-col">
+                    <span className="font-semibold text-[#c0a068]">{formatCurrency(results.marginAmount)}</span>
+                    <span className="text-xs text-[#c0a068] opacity-80">{formatCurrency(results.marginPerHour)} / rbh</span>
+                  </div>
                 </div>
                 <div className="flex justify-between items-center border-b border-white/10 pb-2">
                   <span className="opacity-80 text-sm">Pracownik otrzymuje netto / h</span>
