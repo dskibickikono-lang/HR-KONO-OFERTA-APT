@@ -74,13 +74,13 @@ describe('HIGH-1: refaktura_z_marza row must display the BILLED (marked-up) valu
 });
 
 describe('MED-1: no Infinity/NaN in PDF when hoursPerMonth = 0', () => {
-  it('per-RBH cells render "—" instead of Infinity', () => {
+  it('per-rbh (roboczo-godz.) cells render "—" instead of Infinity', () => {
     const zeroHours: APTInputs = { ...inputs, hoursPerMonth: 0 };
     const results = renderHook(() => useAPTCalculation(zeroHours)).result.current;
     const { container } = render(<APTOffer data={{ inputs: zeroHours, results }} />);
     const text = container.textContent ?? '';
     expect(text).not.toMatch(/Infinity/);
     expect(text).not.toMatch(/NaN/);
-    expect(text).toContain('—'); // guarded per-RBH cells
+    expect(text).toContain('—'); // guarded per-rbh (roboczo-godz.) cells
   });
 });

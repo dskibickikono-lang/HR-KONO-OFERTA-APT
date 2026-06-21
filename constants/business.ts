@@ -1,0 +1,2 @@
+export const MARGIN_THRESHOLD_RISK = 8;
+export const MARGIN_THRESHOLD_HEALTHY = 12;

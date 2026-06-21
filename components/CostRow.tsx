@@ -1,5 +1,7 @@
 import React from 'react';
 import { AdditionalCost, CostMode } from '../hooks/useAPTCalculation';
+import { HelpPopover } from './HelpPopover';
+import { HELP_CONTENT } from '../constants/helpContent';
 
 interface CostRowProps {
   cost: AdditionalCost;
@@ -29,10 +31,24 @@ export const COST_ROW_LAYOUT_CLASSES = {
 };
 
 export const CostRow: React.FC<CostRowProps> = ({ cost, onChange }) => {
+  const getHelpContent = (id: string) => {
+    switch (id) {
+      case 'legalizacja': return HELP_CONTENT.legalization;
+      case 'zakwaterowanie': return HELP_CONTENT.accommodation;
+      case 'koordynator': return HELP_CONTENT.coordinator;
+      default: return null;
+    }
+  };
+
+  const help = getHelpContent(cost.id);
+
   return (
     <div className={`${COST_ROW_LAYOUT_CLASSES.container} py-2 border-b border-gray-100 last:border-0`}>
       <div className={COST_ROW_LAYOUT_CLASSES.label}>
-        <label className="text-sm font-medium text-gray-700">{cost.label}</label>
+        <div className="flex items-center">
+          <label className="text-sm font-medium text-gray-700">{cost.label}</label>
+          {help && <HelpPopover title={help.title} content={help.content} />}
+        </div>
       </div>
 
       <div className={COST_ROW_LAYOUT_CLASSES.amount}>
