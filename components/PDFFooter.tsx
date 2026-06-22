@@ -1,20 +1,25 @@
 import React from 'react';
+import { COMPANY_DETAILS } from '../constants/company';
 
 interface PDFFooterProps {
   /** 'client' dodaje sekcję podpisów; 'internal' dodaje notę o poufności. */
   variant: 'client' | 'internal';
   /** Wstawiane nad linią "Przygotował/a" jeśli podane. */
   preparedBy?: string;
+  /** Podmiot — do letterhead agencji w stopce klienta (dane z constants/company.ts). */
+  entity?: string;
 }
 
 /**
  * Stopka prawna PDF (wspólna dla strony klienta i wewnętrznej).
  * Oświadczenie o stawce minimalnej + nota o orientacyjności danych + termin płatności,
- * a dla wariantu klienta — linie podpisu. Styl print-friendly (bez ciężkich teł).
+ * a dla wariantu klienta — letterhead agencji i linie podpisu. Styl print-friendly.
  */
-export const PDFFooter: React.FC<PDFFooterProps> = ({ variant, preparedBy }) => {
+export const PDFFooter: React.FC<PDFFooterProps> = ({ variant, preparedBy, entity }) => {
+  const company = entity ? COMPANY_DETAILS[entity] : undefined;
+
   return (
-    <div className="mt-12 pt-6 border-t border-slate-300 text-slate-600 text-xs leading-relaxed">
+    <div className="pdf-footer mt-12 pt-6 border-t border-slate-300 text-slate-600 text-xs leading-relaxed">
       <div className="space-y-3">
         <div>
           <p className="font-semibold text-slate-700 mb-1 uppercase tracking-wide text-[11px]">Oświadczenie</p>
@@ -44,26 +49,41 @@ export const PDFFooter: React.FC<PDFFooterProps> = ({ variant, preparedBy }) => 
       </div>
 
       {variant === 'client' && (
-        <div className="mt-8 grid grid-cols-2 gap-x-12 gap-y-8 text-slate-700">
-          <div>
-            <div className="border-b border-slate-400 h-8 flex items-end pb-1">
-              {preparedBy ? <span className="font-medium">{preparedBy}</span> : null}
+        <>
+          {company?.name && (
+            <div className="mt-8 text-[11px] text-slate-500 leading-snug">
+              <p className="font-semibold text-slate-700">{company.name}</p>
+              {company.address && <p>{company.address}</p>}
+              {(company.nip || company.regon) && (
+                <p>
+                  {company.nip && `NIP: ${company.nip}`}
+                  {company.nip && company.regon && ' · '}
+                  {company.regon && `REGON: ${company.regon}`}
+                </p>
+              )}
             </div>
-            <p className="mt-1 text-[11px] text-slate-500">Przygotował/a</p>
+          )}
+          <div className="mt-6 grid grid-cols-2 gap-x-12 gap-y-8 text-slate-700">
+            <div>
+              <div className="border-b border-slate-400 h-8 flex items-end pb-1">
+                {preparedBy ? <span className="font-medium">{preparedBy}</span> : null}
+              </div>
+              <p className="mt-1 text-[11px] text-slate-500">Przygotował/a</p>
+            </div>
+            <div>
+              <div className="border-b border-slate-400 h-8" />
+              <p className="mt-1 text-[11px] text-slate-500">Data</p>
+            </div>
+            <div>
+              <div className="border-b border-slate-400 h-8" />
+              <p className="mt-1 text-[11px] text-slate-500">Podpis Klienta</p>
+            </div>
+            <div>
+              <div className="border-b border-slate-400 h-8" />
+              <p className="mt-1 text-[11px] text-slate-500">Pieczęć</p>
+            </div>
           </div>
-          <div>
-            <div className="border-b border-slate-400 h-8" />
-            <p className="mt-1 text-[11px] text-slate-500">Data</p>
-          </div>
-          <div>
-            <div className="border-b border-slate-400 h-8" />
-            <p className="mt-1 text-[11px] text-slate-500">Podpis Klienta</p>
-          </div>
-          <div>
-            <div className="border-b border-slate-400 h-8" />
-            <p className="mt-1 text-[11px] text-slate-500">Pieczęć</p>
-          </div>
-        </div>
+        </>
       )}
     </div>
   );

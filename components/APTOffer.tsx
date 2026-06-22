@@ -65,9 +65,12 @@ const APTOffer: React.FC<Props> = ({ data }) => {
       <style>
         {`
           @media print {
-            body { background: white; margin: 0; padding: 0; }
+            @page { size: A4; margin: 0; }
+            html, body { background: white; margin: 0; padding: 0; }
+            * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .print-page { padding: 20mm; margin: 0; border: none; box-shadow: none; max-width: none; width: 100%; min-height: 100vh; }
             .page-break { page-break-before: always; }
+            .cost-section, table, thead, tr, .pdf-footer { page-break-inside: avoid; }
             button { display: none !important; }
             .no-print { display: none !important; }
           }
@@ -226,7 +229,7 @@ const APTOffer: React.FC<Props> = ({ data }) => {
           </div>
         </div>
 
-        <PDFFooter variant="client" preparedBy={inputs.preparedBy} />
+        <PDFFooter variant="client" preparedBy={inputs.preparedBy} entity={inputs.entity} />
 
         <div className="mt-8 flex justify-center no-print">
           <button
