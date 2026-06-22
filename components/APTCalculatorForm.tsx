@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAPTCalculation, calculateReverse, APTInputs, APTResults, AdditionalCost, Entity, ContractType, ContractorVariant } from '../hooks/useAPTCalculation';
 import { CostRow, COST_ROW_LAYOUT_CLASSES } from './CostRow';
-import { Building2, FileText, Calculator, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Building2, FileText, Calculator, AlertTriangle, ChevronDown, ChevronUp, User, CalendarClock } from 'lucide-react';
 import { MARGIN_THRESHOLD_RISK, MARGIN_THRESHOLD_HEALTHY } from '../constants/business';
 import { HelpPopover } from './HelpPopover';
 import { HELP_CONTENT } from '../constants/helpContent';
@@ -21,10 +21,19 @@ interface Props {
   initialData?: { inputs: APTInputs, results: APTResults } | null;
 }
 
+// Domyślna ważność oferty: dziś + 30 dni, format YYYY-MM-DD dla <input type="date">.
+const getDefaultValidUntil = (): string => {
+  const d = new Date();
+  d.setDate(d.getDate() + 30);
+  return d.toISOString().split('T')[0];
+};
+
 const DEFAULT_INPUTS: APTInputs = {
   entity: 'HR KONO S.A.',
   clientName: '',
   position: '',
+  preparedBy: '',
+  validUntil: getDefaultValidUntil(),
   contractType: 'Umowa zlecenie',
   contractorVariant: 'Standard ozusowany',
   workerCount: 1,
@@ -65,7 +74,9 @@ const validateAPTInputs = (data: any): data is APTInputs => {
 };
 
 const getInitialInputs = (initialData?: { inputs: APTInputs } | null): APTInputs => {
-  if (initialData?.inputs) return initialData.inputs;
+  // Merge z DEFAULT_INPUTS: gwarantuje, że nowo dodane (opcjonalne) pola jak
+  // preparedBy/validUntil mają wartość także przy danych zapisanych przed ich wprowadzeniem.
+  if (initialData?.inputs) return { ...DEFAULT_INPUTS, ...initialData.inputs };
   try {
     const stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (stored) {
@@ -75,7 +86,7 @@ const getInitialInputs = (initialData?: { inputs: APTInputs } | null): APTInputs
         parsed.version === SESSION_VERSION &&
         validateAPTInputs(parsed.data)
       ) {
-        return parsed.data;
+        return { ...DEFAULT_INPUTS, ...parsed.data };
       }
     }
   } catch (e) {
@@ -429,6 +440,37 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                   className={`w-full px-3 py-2 border ${inputs.accidentInsuranceRate < 0 ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-[#396542] outline-none ${inputs.entity !== 'Inny' ? 'bg-gray-100' : ''}`}
                 />
                 {inputs.accidentInsuranceRate < 0 && <span className="text-xs text-red-500">Nie może być mniejsza niż 0</span>}
+              </div>
+
+              {/* Metadane oferty: kto przygotował + do kiedy ważna (wyłącznie do PDF, bez wpływu na kalkulację) */}
+              <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 mt-2 border-t border-gray-100">
+                <div>
+                  <label htmlFor="preparedBy" className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1">
+                    <User className="w-4 h-4 text-[#c0a068]" />
+                    Przygotował/a
+                  </label>
+                  <input
+                    id="preparedBy"
+                    type="text"
+                    value={inputs.preparedBy ?? ''}
+                    onChange={(e) => handleInputChange('preparedBy', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-slate-100 focus:bg-white focus:ring-2 focus:ring-[#396542] outline-none transition-colors"
+                    placeholder="Imię i nazwisko handlowca"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="validUntil" className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1">
+                    <CalendarClock className="w-4 h-4 text-[#c0a068]" />
+                    Oferta ważna do
+                  </label>
+                  <input
+                    id="validUntil"
+                    type="date"
+                    value={inputs.validUntil ?? ''}
+                    onChange={(e) => handleInputChange('validUntil', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-slate-100 focus:bg-white focus:ring-2 focus:ring-[#396542] outline-none transition-colors"
+                  />
+                </div>
               </div>
             </div>
           </div>

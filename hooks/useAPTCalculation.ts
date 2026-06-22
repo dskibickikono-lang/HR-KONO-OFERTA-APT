@@ -18,6 +18,8 @@ export interface APTInputs {
   entity: Entity;
   clientName: string;
   position: string;               // stanowisko np. "Kompletacja zamówień"
+  preparedBy?: string;            // handlowiec przygotowujący ofertę (metadana do PDF, bez wpływu na kalkulację)
+  validUntil?: string;            // data ważności oferty YYYY-MM-DD (metadana do PDF, bez wpływu na kalkulację)
   contractType: ContractType;
   contractorVariant: ContractorVariant;
   workerCount: number;
