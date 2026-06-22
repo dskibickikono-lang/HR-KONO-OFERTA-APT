@@ -1,7 +1,8 @@
 import React from 'react';
 import { Printer } from 'lucide-react';
-import { APTInputs, APTResults } from '../hooks/useAPTCalculation';
+import { APTInputs, APTResults, AdditionalCost } from '../hooks/useAPTCalculation';
 import { PDFFooter } from './PDFFooter';
+import { PDFMainTable } from './PDFMainTable';
 
 interface Props {
   data: {
@@ -23,10 +24,8 @@ const APTOffer: React.FC<Props> = ({ data }) => {
     return new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(value);
   };
 
-  // Guardy przed dzieleniem przez zero (MED-1): brak osób / godzin => '—'.
+  // Guard przed dzieleniem przez zero (MED-1): brak godzin => '—'.
   const totalHours = inputs.workerCount * inputs.hoursPerMonth;
-  const perPerson = (value: number) =>
-    inputs.workerCount > 0 ? formatCurrency(value / inputs.workerCount) : '—';
   const perRbh = (value: number) =>
     totalHours > 0 ? formatCurrency(value / totalHours) : '—';
 
@@ -42,10 +41,23 @@ const APTOffer: React.FC<Props> = ({ data }) => {
     return Number.isNaN(d.getTime()) ? inputs.validUntil : d.toLocaleDateString('pl-PL');
   };
 
-  const getBilledAdditionalCosts = () => {
-    return inputs.additionalCosts.filter(
-      cost => cost.mode !== 'po_stronie_klienta' && cost.amountPerPerson > 0
-    );
+  // Koszty wliczone w stawkę godzinową (sekcja "po stronie agencji").
+  const inStawceCosts = inputs.additionalCosts.filter(
+    c => c.mode === 'w_stawce' && c.amountPerPerson > 0
+  );
+  // Koszty refakturowane jako osobne pozycje faktury (z marżą lub 1:1).
+  const refakturaCosts = inputs.additionalCosts.filter(
+    c => (c.mode === 'refaktura_z_marza' || c.mode === 'refaktura_1do1') && c.amountPerPerson > 0
+  );
+  const refakturaTotalBilled = results.refakturaZMarzaBilled + results.refaktura1to1Total;
+
+  // Miesięczna wartość refaktury fakturowana klientowi: z marżą dla z_marza, 1:1 dla 1do1.
+  // Koszty jednorazowe amortyzowane na horyzont kontraktu (spójne z hookiem).
+  const billedMonthlyForCost = (cost: AdditionalCost): number => {
+    const baseVal = cost.isProjectLevel ? cost.amountPerPerson : cost.amountPerPerson * inputs.workerCount;
+    const monthlyVal = cost.isPerMonth ? baseVal : baseVal / horizon;
+    const marginFactor = 1 - inputs.marginPercent / 100;
+    return cost.mode === 'refaktura_z_marza' && marginFactor > 0 ? monthlyVal / marginFactor : monthlyVal;
   };
 
   return (
@@ -115,120 +127,104 @@ const APTOffer: React.FC<Props> = ({ data }) => {
           </div>
         </div>
 
-        <div className="mb-12">
-          <table className="w-full text-sm">
-            <thead className="bg-[#396542] text-white">
-              <tr>
-                <th className="py-3 px-4 text-left">Pozycja</th>
-                <th className="py-3 px-4 text-right w-32">Wartość miesięczna</th>
-                <th className="py-3 px-4 text-right w-32">Na osobę</th>
-                <th className="py-3 px-4 text-right w-32">Na rbh (roboczo-godz.)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              <tr>
-                <td className="py-3 px-4 font-medium">Wynagrodzenie brutto pracowników</td>
-                <td className="py-3 px-4 text-right">{formatCurrency(results.gross)}</td>
-                <td className="py-3 px-4 text-right">{perPerson(results.gross)}</td>
-                <td className="py-3 px-4 text-right">{formatCurrency(inputs.grossRateHourly)}</td>
-              </tr>
-              {results.zusTotal > 0 && (
-                <tr>
-                  <td className="py-3 px-4 font-medium">ZUS i fundusze pracodawcy</td>
-                  <td className="py-3 px-4 text-right">{formatCurrency(results.zusTotal)}</td>
-                  <td className="py-3 px-4 text-right">{perPerson(results.zusTotal)}</td>
-                  <td className="py-3 px-4 text-right">{perRbh(results.zusTotal)}</td>
-                </tr>
-              )}
-              {results.ppkAmount > 0 && (
-                <tr>
-                  <td className="py-3 px-4 font-medium">PPK pracodawcy</td>
-                  <td className="py-3 px-4 text-right">{formatCurrency(results.ppkAmount)}</td>
-                  <td className="py-3 px-4 text-right">{perPerson(results.ppkAmount)}</td>
-                  <td className="py-3 px-4 text-right">{perRbh(results.ppkAmount)}</td>
-                </tr>
-              )}
-              {inputs.contractType === 'Praca tymczasowa' && results.vacationReserve > 0 && (
-                <tr>
-                  <td className="py-3 px-4 font-medium">Rezerwa urlopowa / koszty APT</td>
-                  <td className="py-3 px-4 text-right">{formatCurrency(results.vacationReserve)}</td>
-                  <td className="py-3 px-4 text-right">{perPerson(results.vacationReserve)}</td>
-                  <td className="py-3 px-4 text-right">{perRbh(results.vacationReserve)}</td>
-                </tr>
-              )}
-
-              <tr className="bg-gray-50 font-bold border-t-2 border-gray-300">
-                <td className="py-3 px-4">KOSZT WŁASNY AGENCJI</td>
-                <td className="py-3 px-4 text-right">{formatCurrency(results.agencyCost)}</td>
-                <td className="py-3 px-4 text-right">{perPerson(results.agencyCost)}</td>
-                <td className="py-3 px-4 text-right">{perRbh(results.agencyCost)}</td>
-              </tr>
-
-              {getBilledAdditionalCosts().length > 0 && (
-                <tr className="bg-gray-100 font-bold border-t-2 border-gray-300">
-                  <td colSpan={4} className="py-3 px-4">REFAKTURY KOSZTÓW</td>
-                </tr>
-              )}
-
-              {/* Additional Billed Costs (Refaktury) */}
-              {getBilledAdditionalCosts().map(cost => {
-                const isProject = cost.isProjectLevel;
-                const baseVal = isProject ? cost.amountPerPerson : cost.amountPerPerson * inputs.workerCount;
-                // Koszt jednorazowy rozkładamy na horyzont kontraktu (HIGH-2),
-                // żeby pozycja na fakturze miesięcznej była wartością miesięczną.
-                const monthlyVal = cost.isPerMonth ? baseVal : baseVal / horizon;
-                // refaktura_z_marza jest fakturowana z marżą (monthly / marginFactor),
-                // więc pozycja zgadza się z WARTOŚĆ FAKTURY DLA KLIENTA. 1:1 = nominalnie.
-                const marginFactor = 1 - inputs.marginPercent / 100;
-                const billedVal =
-                  cost.mode === 'refaktura_z_marza' && marginFactor > 0
-                    ? monthlyVal / marginFactor
-                    : monthlyVal;
-                return (
-                  <tr key={cost.id} className="text-gray-600">
-                    <td className="py-3 px-4 pl-8">
-                      {cost.label}
-                      {cost.mode === 'refaktura_1do1' && ' (refaktura 1:1)'}
-                      {cost.mode === 'refaktura_z_marza' && ' (refaktura z marżą)'}
-                      {!cost.isPerMonth && ` (jednorazowy, amortyzowany / ${horizon} mies.)`}
-                    </td>
-                    <td className="py-3 px-4 text-right">{formatCurrency(billedVal)}</td>
-                    <td className="py-3 px-4 text-right">{perPerson(billedVal)}</td>
-                    <td className="py-3 px-4 text-right">{perRbh(billedVal)}</td>
-                  </tr>
-                );
-              })}
-
-              <tr className="bg-[#396542]/10 font-bold text-lg border-t-2 border-gray-300">
-                <td className="py-4 px-4 text-[#396542]">WARTOŚĆ FAKTURY DLA KLIENTA</td>
-                <td className="py-4 px-4 text-right text-[#396542]">{formatCurrency(results.totalMonthlyBilling)}</td>
-                <td className="py-4 px-4 text-right text-[#396542]">{perPerson(results.totalMonthlyBilling)}</td>
-                <td className="py-4 px-4 text-right text-[#396542]"></td>
-              </tr>
-              <tr>
-                <td colSpan={4} className="py-6 text-center">
-                  <div className="inline-block border-2 border-[#c0a068] rounded-xl p-4 bg-[#c0a068]/10">
-                    <div className="text-sm text-gray-600 font-medium mb-1">STAWKA SPRZEDAŻOWA rbh (roboczo-godz.)</div>
-                    <div className="text-4xl font-bold text-[#c0a068]">
-                      {formatCurrency(results.finalHourlyRate)}
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        {/* Tabela główna — format strzałkowy (inspiracja Gi Group) */}
+        <div className="mb-8">
+          <PDFMainTable inputs={inputs} results={results} />
+          <p className="text-xs text-gray-500 mt-2">
+            Stawka za usługę obejmuje wynagrodzenie pracownika, narzuty ZUS i fundusze oraz obsługę
+            agencji. Refaktury kosztów (poniżej) fakturowane są jako osobne pozycje.
+          </p>
         </div>
 
-        {results.clientSideCosts.length > 0 && (
-          <div className="mb-8">
-            <h3 className="font-bold text-gray-800 mb-2 border-b border-gray-200 pb-2">Po stronie Klienta:</h3>
-            <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
-              {results.clientSideCosts.map(cost => (
-                <li key={cost.id}>{cost.label}</li>
+        {/* Trzy sekcje kosztów: po stronie agencji / refaktury / po stronie klienta */}
+        <div className="mb-8 space-y-5">
+          <div className="cost-section">
+            <h3 className="text-sm font-bold uppercase tracking-wide text-[#396542] border-b-2 border-[#396542]/20 pb-1 mb-3">
+              W stawce godzinowej (po stronie agencji)
+            </h3>
+            <ul className="text-sm text-gray-700 space-y-1.5">
+              <li className="flex items-start gap-2">
+                <span className="text-[#396542] font-bold mt-0.5">✓</span>Pełna obsługa administracyjno-kadrowa i płacowa
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-[#396542] font-bold mt-0.5">✓</span>Rozliczenia ZUS i zaliczek podatkowych pracowników
+              </li>
+              {inStawceCosts.map(cost => (
+                <li key={cost.id} className="flex items-start gap-2">
+                  <span className="text-[#396542] font-bold mt-0.5">✓</span>{cost.label.split(' /')[0]}
+                </li>
               ))}
             </ul>
           </div>
-        )}
+
+          {refakturaCosts.length > 0 && (
+            <div className="cost-section">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-[#396542] border-b-2 border-[#396542]/20 pb-1 mb-3">
+                Refaktury kosztów (osobne pozycje faktury)
+              </h3>
+              <table className="w-full text-sm">
+                <thead className="text-xs text-gray-500 uppercase tracking-wide">
+                  <tr className="border-b border-gray-200">
+                    <th className="py-1.5 text-left font-medium">Pozycja</th>
+                    <th className="py-1.5 text-right font-medium w-40">Wartość miesięczna</th>
+                    <th className="py-1.5 text-right font-medium w-44">Tryb rozliczenia</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {refakturaCosts.map(cost => (
+                    <tr key={cost.id} className="text-gray-700">
+                      <td className="py-2">
+                        {cost.label.split(' /')[0]}
+                        {!cost.isPerMonth && (
+                          <span className="text-xs text-gray-400"> (jednorazowy, amort. / {horizon} mc)</span>
+                        )}
+                      </td>
+                      <td className="py-2 text-right font-mono tabular-nums">{formatCurrency(billedMonthlyForCost(cost))}</td>
+                      <td className="py-2 text-right text-xs">
+                        {cost.mode === 'refaktura_z_marza' ? `z marżą ${inputs.marginPercent}%` : 'bez marży (1:1)'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {results.clientSideCosts.length > 0 && (
+            <div className="cost-section">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-[#396542] border-b-2 border-[#396542]/20 pb-1 mb-3">
+                Po stronie klienta
+              </h3>
+              <ul className="text-sm text-gray-700 space-y-1.5">
+                {results.clientSideCosts.map(cost => (
+                  <li key={cost.id} className="flex items-start gap-2">
+                    <span className="text-gray-400 font-bold mt-0.5">•</span>{cost.label.split(' /')[0]}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {/* Dolna linia — wartość faktury miesięcznej + stawki godzinowe */}
+        <div className="mb-4 rounded-xl border-2 border-[#396542] overflow-hidden">
+          <div className="bg-[#396542] text-white px-5 py-4 flex items-center justify-between gap-4">
+            <span className="font-semibold">Szacowana wartość faktury / miesiąc</span>
+            <span className="text-2xl font-bold font-mono tabular-nums">{formatCurrency(results.totalMonthlyBilling)}</span>
+          </div>
+          <div className="bg-[#c0a068]/10 px-5 py-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-gray-600">Stawka godzinowa za usługę</span>
+              <span className="font-bold font-mono tabular-nums text-[#8a6d2f]">{perRbh(results.baseMonthlyBilling)}</span>
+            </div>
+            {refakturaTotalBilled > 0.005 && (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-gray-600">Średnia stawka łączna z refakturami</span>
+                <span className="font-bold font-mono tabular-nums text-[#8a6d2f]">{perRbh(results.totalMonthlyBilling)}</span>
+              </div>
+            )}
+          </div>
+        </div>
 
         <PDFFooter variant="client" preparedBy={inputs.preparedBy} />
 
