@@ -17,6 +17,14 @@ export interface AdditionalCost {
   isProjectLevel?: boolean;       // true = not multiplied by workerCount (e.g. koordinator)
 }
 
+// Dodatkowy scenariusz stawki (np. zmiana noc/weekend) — alternatywny grossRateHourly.
+// Renderowany jako osobna kolumna w głównej tabeli PDF; nie wpływa na kalkulację podstawową.
+export interface RateVariant {
+  id: string;
+  label: string;
+  grossRateHourly: number;
+}
+
 export interface APTInputs {
   entity: Entity;
   clientName: string;
@@ -34,6 +42,7 @@ export interface APTInputs {
   ppkEmployerRate: number;        // PPK pracodawcy % np. 1.5
   vacationReserveRate: number;    // rezerwa urlopowa % np. 8.3
   additionalCosts: AdditionalCost[];
+  rateVariants?: RateVariant[];   // dodatkowe scenariusze stawek do PDF (kolumny); brak wpływu na kalkulację podstawową
 }
 
 export interface APTResults {

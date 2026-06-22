@@ -1,9 +1,9 @@
 import React from 'react';
 import { Printer } from 'lucide-react';
-import { APTInputs, APTResults, AdditionalCost, ViewMode, MarginStatus, getMarginStatus } from '../hooks/useAPTCalculation';
+import { APTInputs, APTResults, AdditionalCost, ViewMode, MarginStatus, getMarginStatus, calculateForward } from '../hooks/useAPTCalculation';
 import { MARGIN_THRESHOLD_RISK, MARGIN_THRESHOLD_HEALTHY } from '../constants/business';
 import { PDFFooter } from './PDFFooter';
-import { PDFMainTable } from './PDFMainTable';
+import { PDFMainTable, VariantColumn } from './PDFMainTable';
 
 // Wizualne mapowanie statusu marży (emoji + kolory) dla strony wewnętrznej.
 const MARGIN_STATUS_VIZ: Record<MarginStatus, { emoji: string; badge: string; row: string }> = {
@@ -67,6 +67,17 @@ const APTOffer: React.FC<Props> = ({ data }) => {
   // horyzont strażowany (guard zgodny z resztą PDF: undefined/0 => 1) -> brak NaN.
   const contractValue = results.totalMonthlyBilling * horizon;
   const projection12M = results.totalMonthlyBilling * 12;
+
+  // Kolumny tabeli głównej: podstawowy scenariusz + warianty stawek (jeśli zdefiniowane).
+  // Każdy wariant liczony niezależnie przez calculateForward z własnym grossRateHourly.
+  const rateVariants = inputs.rateVariants ?? [];
+  const mainTableColumns: VariantColumn[] = [
+    { label: rateVariants.length > 0 ? 'Podstawowy' : undefined, results },
+    ...rateVariants.map(v => ({
+      label: v.label,
+      results: calculateForward({ ...inputs, grossRateHourly: v.grossRateHourly }),
+    })),
+  ];
 
   // Miesięczna wartość refaktury fakturowana klientowi: z marżą dla z_marza, 1:1 dla 1do1.
   // Koszty jednorazowe amortyzowane na horyzont kontraktu (spójne z hookiem).
@@ -149,7 +160,7 @@ const APTOffer: React.FC<Props> = ({ data }) => {
 
         {/* Tabela główna — format strzałkowy (inspiracja Gi Group) */}
         <div className="mb-8">
-          <PDFMainTable inputs={inputs} results={results} />
+          <PDFMainTable inputs={inputs} columns={mainTableColumns} />
           <p className="text-xs text-gray-500 mt-2">
             Stawka za usługę obejmuje wynagrodzenie pracownika, narzuty ZUS i fundusze oraz obsługę
             agencji. Refaktury kosztów (poniżej) fakturowane są jako osobne pozycje.
