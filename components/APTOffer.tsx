@@ -63,6 +63,11 @@ const APTOffer: React.FC<Props> = ({ data }) => {
   // Status marży (od wartości sprzedaży = inputs.marginPercent) do wizualizacji w PDF wewn.
   const marginStatus = getMarginStatus(inputs.marginPercent);
 
+  // Wartość kontraktu na horyzont + projekcja roczna (board PDF).
+  // horyzont strażowany (guard zgodny z resztą PDF: undefined/0 => 1) -> brak NaN.
+  const contractValue = results.totalMonthlyBilling * horizon;
+  const projection12M = results.totalMonthlyBilling * 12;
+
   // Miesięczna wartość refaktury fakturowana klientowi: z marżą dla z_marza, 1:1 dla 1do1.
   // Koszty jednorazowe amortyzowane na horyzont kontraktu (spójne z hookiem).
   const billedMonthlyForCost = (cost: AdditionalCost): number => {
@@ -388,6 +393,24 @@ const APTOffer: React.FC<Props> = ({ data }) => {
                     <span className="text-gray-600">Marża brutto (od sprzedaży) zł/rbh</span>
                     <span className="font-bold text-lg text-[#396542]">{formatCurrency(results.marginPerHour)}</span>
                   </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Marża / pracownik / mc ({inputs.workerCount} prac.)</span>
+                    <span className="font-bold">{inputs.workerCount > 0 ? formatCurrency(results.marginAmount / inputs.workerCount) : '—'}</span>
+                  </div>
+                </div>
+                <div className="mt-3 pt-3 border-t border-gray-100 text-sm space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Wartość sprzedaży bazowa</span>
+                    <span className="font-mono">{formatCurrency(results.baseMonthlyBilling)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">− Koszt własny agencji</span>
+                    <span className="font-mono">{formatCurrency(results.agencyCost)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold border-t border-gray-200 pt-1">
+                    <span>= Marża</span>
+                    <span className="font-mono text-[#396542]">{formatCurrency(results.marginAmount)}</span>
+                  </div>
                 </div>
                 <div className="mt-4 text-xs text-gray-500 text-center">
                   Model marży: od wartości sprzedaży
@@ -396,6 +419,26 @@ const APTOffer: React.FC<Props> = ({ data }) => {
             </div>
           </div>
         </div>
+        {/* Wartość kontraktu + projekcja roczna */}
+        <div className="mt-8 rounded-xl border-l-4 border-[#396542] bg-gradient-to-r from-[#396542]/5 to-slate-50 p-5">
+          <h2 className="text-lg font-bold mb-3 text-[#396542]">Wartość kontraktu</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm text-gray-500">Horyzont {horizon} mies.</div>
+              <div className="text-2xl font-bold font-mono text-gray-900">{formatCurrency(contractValue)}</div>
+              <div className="text-xs text-gray-400">{formatCurrency(results.totalMonthlyBilling)} × {horizon}</div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-500">Projekcja roczna (12 mies.)</div>
+              <div className="text-2xl font-bold font-mono text-gray-900">{formatCurrency(projection12M)}</div>
+              <div className="text-xs text-gray-400">{formatCurrency(results.totalMonthlyBilling)} × 12</div>
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-gray-500">
+            ⚠️ Projekcja na bazie bieżących parametrów — faktyczna wartość zależy od liczby rbh w miesiącu oraz zmian w treści umowy.
+          </p>
+        </div>
+
         {/* Status marży względem progów ryzyka */}
         <div className="mt-8">
           <h2 className="text-lg font-bold mb-4 border-b border-gray-200 pb-2">Status marży względem progów ryzyka</h2>
