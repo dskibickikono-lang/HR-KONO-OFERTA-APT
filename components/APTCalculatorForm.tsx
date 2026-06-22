@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useAPTCalculation, calculateReverse, APTInputs, APTResults, AdditionalCost, Entity, ContractType, ContractorVariant } from '../hooks/useAPTCalculation';
+import { useAPTCalculation, calculateReverse, getMarginStatus, APTInputs, APTResults, AdditionalCost, RateVariant, Entity, ContractType, ContractorVariant, ViewMode, MarginStatus } from '../hooks/useAPTCalculation';
 import { CostRow, COST_ROW_LAYOUT_CLASSES } from './CostRow';
-import { Building2, FileText, Calculator, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
-import { MARGIN_THRESHOLD_RISK, MARGIN_THRESHOLD_HEALTHY } from '../constants/business';
+import { Building2, FileText, Calculator, AlertTriangle, ChevronDown, ChevronUp, User, CalendarClock, Eye, Unlock, Layers, Plus, Trash2 } from 'lucide-react';
 import { HelpPopover } from './HelpPopover';
 import { HELP_CONTENT } from '../constants/helpContent';
 
@@ -17,14 +16,23 @@ const DEFAULT_ADDITIONAL_COSTS: AdditionalCost[] = [
 ];
 
 interface Props {
-  onGenerate: (data: { inputs: APTInputs, results: APTResults }) => void;
+  onGenerate: (data: { inputs: APTInputs, results: APTResults, viewMode: ViewMode }) => void;
   initialData?: { inputs: APTInputs, results: APTResults } | null;
 }
+
+// Domyślna ważność oferty: dziś + 30 dni, format YYYY-MM-DD dla <input type="date">.
+const getDefaultValidUntil = (): string => {
+  const d = new Date();
+  d.setDate(d.getDate() + 30);
+  return d.toISOString().split('T')[0];
+};
 
 const DEFAULT_INPUTS: APTInputs = {
   entity: 'HR KONO S.A.',
   clientName: '',
   position: '',
+  preparedBy: '',
+  validUntil: getDefaultValidUntil(),
   contractType: 'Umowa zlecenie',
   contractorVariant: 'Standard ozusowany',
   workerCount: 1,
@@ -36,11 +44,16 @@ const DEFAULT_INPUTS: APTInputs = {
   ppkEmployerRate: 1.5,
   vacationReserveRate: 8.3,
   additionalCosts: DEFAULT_ADDITIONAL_COSTS,
+  rateVariants: [],
 };
+
+// Maks. dodatkowych wariantów stawek (łącznie 4 kolumny w PDF: podstawowy + 3).
+const MAX_RATE_VARIANTS = 3;
 
 const SESSION_STORAGE_KEY = 'apt_calc_session';
 const SESSION_ADVANCED_KEY = 'apt_calc_advanced_expanded';
 const SESSION_PRICING_MODE_KEY = 'apt_calc_pricing_mode';
+const SESSION_VIEW_MODE_KEY = 'apt_calc_view_mode';
 const SESSION_VERSION = 1;
 
 const validateAPTInputs = (data: any): data is APTInputs => {
@@ -65,7 +78,9 @@ const validateAPTInputs = (data: any): data is APTInputs => {
 };
 
 const getInitialInputs = (initialData?: { inputs: APTInputs } | null): APTInputs => {
-  if (initialData?.inputs) return initialData.inputs;
+  // Merge z DEFAULT_INPUTS: gwarantuje, że nowo dodane (opcjonalne) pola jak
+  // preparedBy/validUntil mają wartość także przy danych zapisanych przed ich wprowadzeniem.
+  if (initialData?.inputs) return { ...DEFAULT_INPUTS, ...initialData.inputs };
   try {
     const stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (stored) {
@@ -75,7 +90,7 @@ const getInitialInputs = (initialData?: { inputs: APTInputs } | null): APTInputs
         parsed.version === SESSION_VERSION &&
         validateAPTInputs(parsed.data)
       ) {
-        return parsed.data;
+        return { ...DEFAULT_INPUTS, ...parsed.data };
       }
     }
   } catch (e) {
@@ -105,6 +120,21 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
   });
   const [targetHourlyRate, setTargetHourlyRate] = useState<string>('');
 
+  // Tryb widoku panelu podsumowania: 'internal' (pełne dane) vs 'client' (bezpieczny
+  // do pokazania klientowi — bez kosztu własnego i marży PLN). Persystowany w sesji.
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    try {
+      return sessionStorage.getItem(SESSION_VIEW_MODE_KEY) === 'client' ? 'client' : 'internal';
+    } catch {
+      return 'internal';
+    }
+  });
+
+  // Sekcja wariantów rozwinięta domyślnie, jeśli jakieś warianty już istnieją.
+  const [variantsExpanded, setVariantsExpanded] = useState<boolean>(
+    () => (inputs.rateVariants?.length ?? 0) > 0
+  );
+
   useEffect(() => {
     sessionStorage.setItem(SESSION_ADVANCED_KEY, String(advancedExpanded));
   }, [advancedExpanded]);
@@ -112,6 +142,10 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
   useEffect(() => {
     sessionStorage.setItem(SESSION_PRICING_MODE_KEY, String(isReverseMode));
   }, [isReverseMode]);
+
+  useEffect(() => {
+    sessionStorage.setItem(SESSION_VIEW_MODE_KEY, viewMode);
+  }, [viewMode]);
 
   useEffect(() => {
     sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
@@ -150,6 +184,36 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
     }));
   };
 
+  const variants = inputs.rateVariants ?? [];
+
+  const addVariant = () => {
+    setInputs(prev => {
+      const current = prev.rateVariants ?? [];
+      if (current.length >= MAX_RATE_VARIANTS) return prev;
+      const newVariant: RateVariant = {
+        id: `var_${Date.now()}`,
+        label: `Wariant ${current.length + 2}`,      // podstawowy = "Wariant 1"
+        grossRateHourly: prev.grossRateHourly,        // pre-fill bieżącą stawką
+      };
+      return { ...prev, rateVariants: [...current, newVariant] };
+    });
+    setVariantsExpanded(true);
+  };
+
+  const updateVariant = (id: string, patch: Partial<RateVariant>) => {
+    setInputs(prev => ({
+      ...prev,
+      rateVariants: (prev.rateVariants ?? []).map(v => (v.id === id ? { ...v, ...patch } : v)),
+    }));
+  };
+
+  const removeVariant = (id: string) => {
+    setInputs(prev => ({
+      ...prev,
+      rateVariants: (prev.rateVariants ?? []).filter(v => v.id !== id),
+    }));
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(value);
   };
@@ -167,14 +231,29 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
   const perRbh = (value: number) =>
     totalHours > 0 ? formatCurrency(value / totalHours) : '—';
 
-  const marginOfCostPercentage = results.agencyCost > 0 ? (results.marginAmount / results.agencyCost) * 100 : 0;
+  // Marża OD WARTOŚCI SPRZEDAŻY (model Gi Group): zysk / wartość faktury bazowej.
+  // Z definicji równa się wpisanej marginPercent, ale liczymy ją z wyników, aby badge
+  // nigdy nie rozjechał się z polem wejściowym ani z formułą billing = koszt / (1 - marża%).
+  const marginOnSalesPercentage = results.baseMonthlyBilling > 0
+    ? (results.marginAmount / results.baseMonthlyBilling) * 100
+    : 0;
 
-  let marginHealthConfig = { label: 'Uwaga', color: 'bg-yellow-500 text-black' };
-  if (marginOfCostPercentage < MARGIN_THRESHOLD_RISK) {
-    marginHealthConfig = { label: 'Ryzyko', color: 'bg-red-500 text-white' };
-  } else if (marginOfCostPercentage > MARGIN_THRESHOLD_HEALTHY) {
-    marginHealthConfig = { label: 'Zdrowa', color: 'bg-emerald-500 text-white' };
-  }
+  // Status marży z pojedynczego źródła (hook) — spójny z wizualizacją w PDF.
+  const marginStatus = getMarginStatus(marginOnSalesPercentage);
+  const STATUS_GRADIENT: Record<MarginStatus, string> = {
+    risk: 'bg-gradient-to-r from-rose-400 to-rose-600 text-white',
+    warning: 'bg-gradient-to-r from-amber-400 to-amber-600 text-white',
+    healthy: 'bg-gradient-to-r from-emerald-400 to-emerald-600 text-white',
+  };
+  const marginHealthConfig = { label: marginStatus.label, color: STATUS_GRADIENT[marginStatus.status] };
+
+  // Listy kosztów dla widoku klienta (spójne z PDF: w stawce / refaktury / po stronie klienta).
+  const inStawceCosts = inputs.additionalCosts.filter(
+    c => c.mode === 'w_stawce' && c.amountPerPerson > 0
+  );
+  const refakturaCostsView = inputs.additionalCosts.filter(
+    c => (c.mode === 'refaktura_z_marza' || c.mode === 'refaktura_1do1') && c.amountPerPerson > 0
+  );
 
   const isFormValid = inputs.workerCount >= 1 &&
                       inputs.hoursPerMonth >= 0 &&
@@ -185,7 +264,8 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                       inputs.accidentInsuranceRate >= 0 &&
                       inputs.ppkEmployerRate >= 0 &&
                       inputs.vacationReserveRate >= 0 &&
-                      inputs.additionalCosts.every(cost => cost.amountPerPerson >= 0);
+                      inputs.additionalCosts.every(cost => cost.amountPerPerson >= 0) &&
+                      variants.every(v => v.grossRateHourly >= 0);
 
   const handleReset = () => {
     sessionStorage.removeItem(SESSION_STORAGE_KEY);
@@ -390,7 +470,7 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
               )}
               <div>
                 <div className="flex items-center mb-1">
-                  <label className="block text-sm font-medium text-gray-700">Marża (od kosztu własnego) %</label>
+                  <label className="block text-sm font-medium text-gray-700">Marża brutto % — od wartości sprzedaży</label>
                   <HelpPopover title={HELP_CONTENT.marginPercent.title} content={HELP_CONTENT.marginPercent.content} />
                 </div>
                 <input
@@ -424,6 +504,37 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                   className={`w-full px-3 py-2 border ${inputs.accidentInsuranceRate < 0 ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-[#396542] outline-none ${inputs.entity !== 'Inny' ? 'bg-gray-100' : ''}`}
                 />
                 {inputs.accidentInsuranceRate < 0 && <span className="text-xs text-red-500">Nie może być mniejsza niż 0</span>}
+              </div>
+
+              {/* Metadane oferty: kto przygotował + do kiedy ważna (wyłącznie do PDF, bez wpływu na kalkulację) */}
+              <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 mt-2 border-t border-gray-100">
+                <div>
+                  <label htmlFor="preparedBy" className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1">
+                    <User className="w-4 h-4 text-[#c0a068]" />
+                    Przygotował/a
+                  </label>
+                  <input
+                    id="preparedBy"
+                    type="text"
+                    value={inputs.preparedBy ?? ''}
+                    onChange={(e) => handleInputChange('preparedBy', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-slate-100 focus:bg-white focus:ring-2 focus:ring-[#396542] outline-none transition-colors"
+                    placeholder="Imię i nazwisko handlowca"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="validUntil" className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1">
+                    <CalendarClock className="w-4 h-4 text-[#c0a068]" />
+                    Oferta ważna do
+                  </label>
+                  <input
+                    id="validUntil"
+                    type="date"
+                    value={inputs.validUntil ?? ''}
+                    onChange={(e) => handleInputChange('validUntil', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-slate-100 focus:bg-white focus:ring-2 focus:ring-[#396542] outline-none transition-colors"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -534,15 +645,115 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
               ))}
             </div>
           </div>
+
+          {/* Warianty stawek (opcjonalne) — dodatkowe kolumny w PDF klienta */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div
+              className="flex items-center justify-between cursor-pointer select-none"
+              onClick={() => setVariantsExpanded(!variantsExpanded)}
+            >
+              <div className="flex items-center gap-2">
+                <Layers className="w-5 h-5 text-[#c0a068]" />
+                <h2 className="text-xl font-semibold">Warianty stawek</h2>
+                {variants.length > 0 && (
+                  <span className="text-xs bg-[#396542] text-white px-2 py-0.5 rounded-full">{variants.length}</span>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                {!variantsExpanded && (
+                  <span className="hidden md:block text-sm text-gray-500">
+                    {variants.length > 0 ? `${variants.length} dod. kolumn w PDF` : 'Opcjonalne (dzień / noc / weekend)'}
+                  </span>
+                )}
+                {variantsExpanded ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+              </div>
+            </div>
+
+            {variantsExpanded && (
+              <div className="mt-4 space-y-3">
+                <p className="text-sm text-gray-500">
+                  Alternatywne stawki brutto (np. zmiana noc, weekend). Każdy wariant pojawi się jako osobna
+                  kolumna w tabeli PDF dla klienta. Stawka podstawowa = „Wariant 1".
+                </p>
+                {variants.map((v, idx) => (
+                  <div key={v.id} className="flex items-end gap-3">
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Nazwa wariantu</label>
+                      <input
+                        type="text"
+                        value={v.label}
+                        onChange={(e) => updateVariant(v.id, { label: e.target.value })}
+                        placeholder={`Wariant ${idx + 2}`}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#396542] outline-none"
+                      />
+                    </div>
+                    <div className="w-32">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Stawka brutto / h</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={v.grossRateHourly}
+                        onChange={(e) => updateVariant(v.id, { grossRateHourly: toNumber(e.target.value) })}
+                        className={`w-full px-3 py-2 border ${v.grossRateHourly < 0 ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-[#396542] outline-none`}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeVariant(v.id)}
+                      className="mb-0.5 p-2 text-gray-400 hover:text-red-600 transition-colors"
+                      title="Usuń wariant"
+                      aria-label={`Usuń wariant ${v.label || idx + 2}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                {variants.length < MAX_RATE_VARIANTS ? (
+                  <button
+                    type="button"
+                    onClick={addVariant}
+                    className="flex items-center gap-2 text-sm font-semibold text-[#396542] hover:text-[#2c5034] transition-colors"
+                  >
+                    <Plus className="w-4 h-4" /> Dodaj wariant
+                  </button>
+                ) : (
+                  <p className="text-xs text-gray-400">Osiągnięto maksimum {MAX_RATE_VARIANTS} wariantów (4 kolumny w PDF).</p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Live Preview Panel (Right Column) */}
         <div className="lg:col-span-1">
           <div className="bg-[#396542] text-white p-6 rounded-xl shadow-lg sticky top-8">
-            <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
-              <Calculator className="w-5 h-5 text-[#c0a068]" />
-              Podsumowanie
-            </h2>
+            <div className="flex items-center justify-between gap-2 mb-6">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <Calculator className="w-5 h-5 text-[#c0a068]" />
+                Podsumowanie
+              </h2>
+              <div className="flex bg-white/10 rounded-lg p-0.5 text-xs" role="group" aria-label="Tryb widoku panelu">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('internal')}
+                  aria-pressed={viewMode === 'internal'}
+                  title="Pełne dane (koszt własny, marża PLN, rozbicie)"
+                  className={`flex items-center gap-1 px-2 py-1 rounded-md transition-colors ${viewMode === 'internal' ? 'bg-white text-[#396542] font-semibold shadow-sm' : 'text-white/70 hover:text-white'}`}
+                >
+                  <Unlock className="w-3.5 h-3.5" /> Wewn.
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('client')}
+                  aria-pressed={viewMode === 'client'}
+                  title="Bezpieczny widok do pokazania klientowi"
+                  className={`flex items-center gap-1 px-2 py-1 rounded-md transition-colors ${viewMode === 'client' ? 'bg-white text-[#396542] font-semibold shadow-sm' : 'text-white/70 hover:text-white'}`}
+                >
+                  <Eye className="w-3.5 h-3.5" /> Klient
+                </button>
+              </div>
+            </div>
 
             {(inputs.clientName || inputs.position) && (
               <div className="mb-6 pb-4 border-b border-white/20">
@@ -556,109 +767,171 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
             )}
 
             <div className="space-y-6">
-              <div className="bg-white/10 p-4 rounded-lg">
-                <div className="text-sm opacity-80 mb-1">Stawka godzinowa (dla klienta)</div>
-                <div className="text-3xl font-bold text-[#c0a068]">
-                  {formatCurrency(results.finalHourlyRate)}
+              {/* Stawka godzinowa — etykieta i wartość zależą od trybu widoku */}
+              {viewMode === 'internal' ? (
+                <div className="bg-white/10 p-4 rounded-lg">
+                  <div className="text-sm opacity-80 mb-1">Stawka godzinowa łączna (z refakturami)</div>
+                  <div className="text-3xl font-bold text-[#c0a068]">
+                    {formatCurrency(results.finalHourlyRate)}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-[#c0a068]/20 border-2 border-[#c0a068] p-4 rounded-lg text-center">
+                  <div className="text-sm opacity-90 mb-1">Stawka godzinowa za usługę</div>
+                  <div className="text-4xl font-bold text-[#c0a068]">
+                    {formatCurrency(results.baseHourlyRate)}
+                  </div>
+                </div>
+              )}
 
-              <div className="space-y-3">
-                <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                  <span className="opacity-80 text-sm">Łączna wartość faktury / mc</span>
-                  <span className="font-semibold">{formatCurrency(results.totalMonthlyBilling)}</span>
-                </div>
-                <div className="flex justify-between items-center border-b border-white/10 pb-2 text-[#c0a068]">
-                  <span className="opacity-90 text-sm">Wartość kontraktu</span>
-                  <span className="font-bold">{formatCurrency(results.totalMonthlyBilling * inputs.contractHorizonMonths)}</span>
-                </div>
-                <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                  <span className="opacity-80 text-sm">Koszt własny agencji / mc</span>
-                  <span className="font-semibold">{formatCurrency(results.agencyCost)}</span>
-                </div>
-                <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                  <div className="flex flex-col">
-                    <span className="opacity-80 text-sm">Marża (od kosztu własnego)</span>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xl font-bold text-white">{marginOfCostPercentage.toFixed(2)}%</span>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider ${marginHealthConfig.color}`}>
-                        {marginHealthConfig.label}
-                      </span>
+              {viewMode === 'internal' ? (
+                <>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                      <span className="opacity-80 text-sm">Łączna wartość faktury / mc</span>
+                      <span className="font-semibold">{formatCurrency(results.totalMonthlyBilling)}</span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-white/10 pb-2 text-[#c0a068]">
+                      <span className="opacity-90 text-sm">Wartość kontraktu</span>
+                      <span className="font-bold">{formatCurrency(results.totalMonthlyBilling * inputs.contractHorizonMonths)}</span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                      <span className="opacity-80 text-sm">Koszt własny agencji / mc</span>
+                      <span className="font-semibold">{formatCurrency(results.agencyCost)}</span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                      <div className="flex flex-col">
+                        <span className="opacity-80 text-sm">Marża brutto (od sprzedaży)</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xl font-bold text-white">{marginOnSalesPercentage.toFixed(2)}%</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider ${marginHealthConfig.color}`}>
+                            {marginHealthConfig.label}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right flex flex-col">
+                        <span className="font-semibold text-[#c0a068]">{formatCurrency(results.marginAmount)}</span>
+                        <span className="text-xs text-[#c0a068] opacity-80">{formatCurrency(results.marginPerHour)} / rbh</span>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                      <span className="opacity-80 text-sm">Pracownik otrzymuje netto / h</span>
+                      <span className="font-semibold">{formatCurrency(results.workerNetto)}</span>
                     </div>
                   </div>
-                  <div className="text-right flex flex-col">
-                    <span className="font-semibold text-[#c0a068]">{formatCurrency(results.marginAmount)}</span>
-                    <span className="text-xs text-[#c0a068] opacity-80">{formatCurrency(results.marginPerHour)} / rbh</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                  <span className="opacity-80 text-sm">Pracownik otrzymuje netto / h</span>
-                  <span className="font-semibold">{formatCurrency(results.workerNetto)}</span>
-                </div>
-              </div>
 
-              <div className="mt-6">
-                <h3 className="text-sm font-semibold mb-2 opacity-80">Rozbicie kosztów (dla {inputs.workerCount} os.)</h3>
-                <div className="bg-white/5 rounded-lg text-xs">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-white/10">
-                        <th className="py-2 px-2 text-left">Pozycja</th>
-                        <th className="py-2 px-2 text-right">Łącznie</th>
-                        <th className="py-2 px-2 text-right">Na osobę</th>
-                        <th className="py-2 px-2 text-right">Na rbh (roboczo-godz.)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="border-b border-white/10">
-                        <td className="py-2 px-2">Brutto</td>
-                        <td className="py-2 px-2 text-right">{formatCurrency(results.gross)}</td>
-                        <td className="py-2 px-2 text-right">{perPerson(results.gross)}</td>
-                        <td className="py-2 px-2 text-right">{formatCurrency(inputs.grossRateHourly)}</td>
-                      </tr>
-                      {results.zusTotal > 0 && (
-                        <tr className="border-b border-white/10">
-                          <td className="py-2 px-2">ZUS</td>
-                          <td className="py-2 px-2 text-right">{formatCurrency(results.zusTotal)}</td>
-                          <td className="py-2 px-2 text-right">{perPerson(results.zusTotal)}</td>
-                          <td className="py-2 px-2 text-right">{perRbh(results.zusTotal)}</td>
-                        </tr>
-                      )}
-                      {results.ppkAmount > 0 && (
-                        <tr className="border-b border-white/10 text-white/70">
-                          <td className="py-2 px-2 pl-4">└ PPK</td>
-                          <td className="py-2 px-2 text-right">{formatCurrency(results.ppkAmount)}</td>
-                          <td className="py-2 px-2 text-right">{perPerson(results.ppkAmount)}</td>
-                          <td className="py-2 px-2 text-right">{perRbh(results.ppkAmount)}</td>
-                        </tr>
-                      )}
-                      {results.vacationReserve > 0 && (
-                        <tr className="border-b border-white/10 text-white/70">
-                          <td className="py-2 px-2 pl-4">└ Urlop</td>
-                          <td className="py-2 px-2 text-right">{formatCurrency(results.vacationReserve)}</td>
-                          <td className="py-2 px-2 text-right">{perPerson(results.vacationReserve)}</td>
-                          <td className="py-2 px-2 text-right">{perRbh(results.vacationReserve)}</td>
-                        </tr>
-                      )}
-                      {results.additionalCostBreakdown.map(cost => (
-                        <tr key={cost.id} className="border-b border-white/10 text-white/70">
-                          <td className="py-2 px-2 pl-4">└ {cost.label.split(' /')[0]}</td>
-                          <td className="py-2 px-2 text-right">{formatCurrency(cost.billedMonthlyTotal)}</td>
-                          <td className="py-2 px-2 text-right">{perPerson(cost.billedMonthlyTotal)}</td>
-                          <td className="py-2 px-2 text-right">{formatCurrency(cost.perRbh)}</td>
-                        </tr>
+                  <div className="mt-6">
+                    <h3 className="text-sm font-semibold mb-2 opacity-80">Rozbicie kosztów (dla {inputs.workerCount} os.)</h3>
+                    <div className="bg-white/5 rounded-lg text-xs">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-white/10">
+                            <th className="py-2 px-2 text-left">Pozycja</th>
+                            <th className="py-2 px-2 text-right">Łącznie</th>
+                            <th className="py-2 px-2 text-right">Na osobę</th>
+                            <th className="py-2 px-2 text-right">Na rbh (roboczo-godz.)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b border-white/10">
+                            <td className="py-2 px-2">Brutto</td>
+                            <td className="py-2 px-2 text-right">{formatCurrency(results.gross)}</td>
+                            <td className="py-2 px-2 text-right">{perPerson(results.gross)}</td>
+                            <td className="py-2 px-2 text-right">{formatCurrency(inputs.grossRateHourly)}</td>
+                          </tr>
+                          {results.zusTotal > 0 && (
+                            <tr className="border-b border-white/10">
+                              <td className="py-2 px-2">ZUS</td>
+                              <td className="py-2 px-2 text-right">{formatCurrency(results.zusTotal)}</td>
+                              <td className="py-2 px-2 text-right">{perPerson(results.zusTotal)}</td>
+                              <td className="py-2 px-2 text-right">{perRbh(results.zusTotal)}</td>
+                            </tr>
+                          )}
+                          {results.ppkAmount > 0 && (
+                            <tr className="border-b border-white/10 text-white/70">
+                              <td className="py-2 px-2 pl-4">└ PPK</td>
+                              <td className="py-2 px-2 text-right">{formatCurrency(results.ppkAmount)}</td>
+                              <td className="py-2 px-2 text-right">{perPerson(results.ppkAmount)}</td>
+                              <td className="py-2 px-2 text-right">{perRbh(results.ppkAmount)}</td>
+                            </tr>
+                          )}
+                          {results.vacationReserve > 0 && (
+                            <tr className="border-b border-white/10 text-white/70">
+                              <td className="py-2 px-2 pl-4">└ Urlop</td>
+                              <td className="py-2 px-2 text-right">{formatCurrency(results.vacationReserve)}</td>
+                              <td className="py-2 px-2 text-right">{perPerson(results.vacationReserve)}</td>
+                              <td className="py-2 px-2 text-right">{perRbh(results.vacationReserve)}</td>
+                            </tr>
+                          )}
+                          {results.additionalCostBreakdown.map(cost => (
+                            <tr key={cost.id} className="border-b border-white/10 text-white/70">
+                              <td className="py-2 px-2 pl-4">└ {cost.label.split(' /')[0]}</td>
+                              <td className="py-2 px-2 text-right">{formatCurrency(cost.billedMonthlyTotal)}</td>
+                              <td className="py-2 px-2 text-right">{perPerson(cost.billedMonthlyTotal)}</td>
+                              <td className="py-2 px-2 text-right">{formatCurrency(cost.perRbh)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-5">
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                      <span className="opacity-80 text-sm">Marża brutto (od sprzedaży)</span>
+                      <span className="font-semibold">{marginOnSalesPercentage.toFixed(2)}%</span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                      <span className="opacity-80 text-sm">Szacowana wartość faktury / mc</span>
+                      <span className="font-semibold">{formatCurrency(results.totalMonthlyBilling)}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-[#c0a068] mb-2">W stawce zawarte</h3>
+                    <ul className="text-sm space-y-1">
+                      <li className="flex items-start gap-2"><span className="text-[#c0a068]">✓</span>Obsługa administracyjno-kadrowa i płacowa</li>
+                      {inStawceCosts.map(c => (
+                        <li key={c.id} className="flex items-start gap-2"><span className="text-[#c0a068]">✓</span>{c.label.split(' /')[0]}</li>
                       ))}
-                    </tbody>
-                  </table>
+                    </ul>
+                  </div>
+
+                  {refakturaCostsView.length > 0 && (
+                    <div>
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-[#c0a068] mb-2">Refaktury (osobne pozycje faktury)</h3>
+                      <ul className="text-sm space-y-1">
+                        {refakturaCostsView.map(c => (
+                          <li key={c.id} className="flex items-start gap-2">
+                            <span className="text-[#c0a068]">→</span>
+                            <span>{c.label.split(' /')[0]} <span className="opacity-60 text-xs">({c.mode === 'refaktura_z_marza' ? 'z marżą' : '1:1'})</span></span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {results.clientSideCosts.length > 0 && (
+                    <div>
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-[#c0a068] mb-2">Po stronie klienta</h3>
+                      <ul className="text-sm space-y-1">
+                        {results.clientSideCosts.map(c => (
+                          <li key={c.id} className="flex items-start gap-2"><span className="opacity-70">•</span>{c.label.split(' /')[0]}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
 
               {(() => {
                 const hintId = 'generate-btn-hint';
                 return (
                   <>
                     <button
-                      onClick={() => onGenerate({ inputs, results })}
+                      onClick={() => onGenerate({ inputs, results, viewMode })}
                       disabled={!isFormValid}
                       aria-disabled={!isFormValid}
                       aria-describedby={!isFormValid ? hintId : undefined}

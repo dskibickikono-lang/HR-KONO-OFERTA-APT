@@ -12,8 +12,8 @@ export const HELP_CONTENT = {
     content: 'Wynagrodzenie brutto pracownika przed podatkiem i ZUS po jego stronie. To główny czynnik kosztotwórczy. Wzrost o 1 PLN brutto podnosi finalną stawkę dla klienta o ok. 1.5–1.8 PLN/h w zależności od narzutów.'
   },
   marginPercent: {
-    title: 'Marża (od kosztu własnego) %',
-    content: 'Marża agencji to procent doliczany do KOSZTU agencji (brutto + ZUS + parametry APT), a nie narzut na stawkę klienta. 10% marży oznacza, że agencja zarabia 10 zł na każde 100 zł własnych kosztów.'
+    title: 'Marża brutto % (od wartości sprzedaży)',
+    content: 'Marża liczona od wartości sprzedaży (faktury), jak w modelu Gi Group. 13% marży to 13 zł zysku na każde 100 zł faktury dla klienta. Wzór: faktura = koszt własny / (1 − marża%).'
   },
   accidentInsuranceRate: {
     title: 'Składka wypadkowa %',
