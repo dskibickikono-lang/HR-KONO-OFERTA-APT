@@ -34,6 +34,13 @@ const APTOffer: React.FC<Props> = ({ data }) => {
     return today.toLocaleDateString('pl-PL');
   };
 
+  // Data ważności oferty (validUntil w formacie YYYY-MM-DD) -> format pl-PL; null gdy brak.
+  const formatValidUntil = (): string | null => {
+    if (!inputs.validUntil) return null;
+    const d = new Date(inputs.validUntil);
+    return Number.isNaN(d.getTime()) ? inputs.validUntil : d.toLocaleDateString('pl-PL');
+  };
+
   const getBilledAdditionalCosts = () => {
     return inputs.additionalCosts.filter(
       cost => cost.mode !== 'po_stronie_klienta' && cost.amountPerPerson > 0
@@ -56,34 +63,53 @@ const APTOffer: React.FC<Props> = ({ data }) => {
 
       {/* PAGE 1 — DLA KLIENTA */}
       <div className="print-page max-w-4xl mx-auto p-8 my-8 bg-white shadow-lg border border-gray-100">
-        <div className="flex justify-between items-start mb-12 border-b-2 border-[#396542] pb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-[#396542] mb-1">HR KONO OFFER SYSTEM</h1>
-            <p className="text-gray-600 font-medium">{inputs.entity}</p>
+        {/* Nagłówek oferty — profesjonalna ramka (on-brand: zieleń HR KONO / złoto APT) */}
+        <div className="mb-8 border-t-4 border-[#396542] bg-white shadow-sm rounded-b-lg px-8 py-6">
+          <div className="flex justify-between items-start gap-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-lg bg-[#396542] text-white flex items-center justify-center font-bold text-lg flex-shrink-0">
+                HK
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-[#396542] leading-tight">HR KONO S.A. / APT WORK Sp. z o.o.</h1>
+                <p className="text-gray-500 text-sm font-medium">{inputs.entity}</p>
+              </div>
+            </div>
+            <div className="text-right text-sm">
+              <p className="text-gray-500">Data wystawienia</p>
+              <p className="font-semibold text-gray-800">{formatDate()}</p>
+              {formatValidUntil() && (
+                <p className="mt-1 inline-block bg-[#c0a068]/15 text-[#8a6d2f] font-semibold px-2 py-0.5 rounded">
+                  Ważna do: {formatValidUntil()}
+                </p>
+              )}
+            </div>
           </div>
-          <div className="text-right">
-            <p className="text-gray-500">Data wystawienia: {formatDate()}</p>
+
+          <div className="mt-5 pt-5 border-t border-gray-200">
+            <p className="text-xs uppercase tracking-widest text-[#c0a068] font-semibold mb-1">Oferta cenowa dla</p>
+            <h2 className="text-xl font-bold text-gray-900">{inputs.clientName || '_______________'}</h2>
           </div>
         </div>
 
-        <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4">Oferta dla: {inputs.clientName || '_______________'}</h2>
-          <div className="grid grid-cols-2 gap-4 text-sm bg-gray-50 p-4 rounded-lg">
+        {/* Zawartość oferty */}
+        <div className="mb-10 bg-slate-50 border-l-4 border-[#396542] rounded-r-lg p-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
-              <span className="text-gray-500">Stanowisko:</span>
-              <p className="font-semibold">{inputs.position || 'Nie podano'}</p>
+              <span className="text-gray-500 block text-xs uppercase tracking-wide">Stanowisko</span>
+              <p className="font-semibold text-gray-900">{inputs.position || 'Nie podano'}</p>
             </div>
             <div>
-              <span className="text-gray-500">Typ umowy:</span>
-              <p className="font-semibold">{inputs.contractType}</p>
+              <span className="text-gray-500 block text-xs uppercase tracking-wide">Liczba osób</span>
+              <p className="font-semibold text-gray-900">{inputs.workerCount}</p>
             </div>
             <div>
-              <span className="text-gray-500">Ilość osób:</span>
-              <p className="font-semibold">{inputs.workerCount}</p>
+              <span className="text-gray-500 block text-xs uppercase tracking-wide">Godziny / m-c</span>
+              <p className="font-semibold text-gray-900">{inputs.hoursPerMonth}</p>
             </div>
             <div>
-              <span className="text-gray-500">Ilość godzin/m-c:</span>
-              <p className="font-semibold">{inputs.hoursPerMonth}</p>
+              <span className="text-gray-500 block text-xs uppercase tracking-wide">Typ umowy</span>
+              <p className="font-semibold text-gray-900">{inputs.contractType}</p>
             </div>
           </div>
         </div>
