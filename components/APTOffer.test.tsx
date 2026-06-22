@@ -84,3 +84,37 @@ describe('MED-1: no Infinity/NaN in PDF when hoursPerMonth = 0', () => {
     expect(text).toContain('—'); // guarded per-rbh (roboczo-godz.) cells
   });
 });
+
+describe('Sprint 3: viewMode "client" ukrywa stronę wewnętrzną', () => {
+  it('w widoku klienta nie renderuje strony technicznej (brak leaku marży PLN)', () => {
+    const results = renderHook(() => useAPTCalculation(inputs)).result.current;
+    const { container, rerender } = render(
+      <APTOffer data={{ inputs, results, viewMode: 'client' }} />
+    );
+    // Strona wewnętrzna i jej dane (marża PLN/rbh, koszt własny rozbity) nie istnieją.
+    expect(container.textContent).not.toContain('KALKULACJA TECHNICZNA');
+    expect(container.textContent).not.toContain('MARŻA AGENCJI');
+
+    // Widok wewnętrzny (domyślny) renderuje stronę techniczną.
+    rerender(<APTOffer data={{ inputs, results, viewMode: 'internal' }} />);
+    expect(container.textContent).toContain('KALKULACJA TECHNICZNA');
+    expect(container.textContent).toContain('MARŻA AGENCJI');
+  });
+});
+
+describe('Sprint 4: warianty stawek renderują dodatkowe kolumny', () => {
+  it('nagłówki kolumn obejmują Podstawowy + etykiety wariantów', () => {
+    const withVariants: APTInputs = {
+      ...inputs,
+      rateVariants: [
+        { id: 'v1', label: 'Zmiana noc', grossRateHourly: 30 },
+        { id: 'v2', label: 'Weekend', grossRateHourly: 35 },
+      ],
+    };
+    const results = renderHook(() => useAPTCalculation(withVariants)).result.current;
+    const { container } = render(<APTOffer data={{ inputs: withVariants, results }} />);
+    expect(container.textContent).toContain('Podstawowy');
+    expect(container.textContent).toContain('Zmiana noc');
+    expect(container.textContent).toContain('Weekend');
+  });
+});
