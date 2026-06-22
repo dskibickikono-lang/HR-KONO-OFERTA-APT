@@ -27,3 +27,8 @@ yarn-error.log*
 
 # Vite
 .vite
+
+# Internal AI / project docs — NIE commitować do publicznego repo
+# (zawierają wewnętrzną strategię, marże, kontekst biznesowy)
+CLAUDE.md
+.claude/
