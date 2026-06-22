@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useAPTCalculation, calculateReverse, getMarginStatus, APTInputs, APTResults, AdditionalCost, Entity, ContractType, ContractorVariant, ViewMode, MarginStatus } from '../hooks/useAPTCalculation';
+import { useAPTCalculation, calculateReverse, getMarginStatus, APTInputs, APTResults, AdditionalCost, RateVariant, Entity, ContractType, ContractorVariant, ViewMode, MarginStatus } from '../hooks/useAPTCalculation';
 import { CostRow, COST_ROW_LAYOUT_CLASSES } from './CostRow';
-import { Building2, FileText, Calculator, AlertTriangle, ChevronDown, ChevronUp, User, CalendarClock, Eye, Unlock } from 'lucide-react';
+import { Building2, FileText, Calculator, AlertTriangle, ChevronDown, ChevronUp, User, CalendarClock, Eye, Unlock, Layers, Plus, Trash2 } from 'lucide-react';
 import { HelpPopover } from './HelpPopover';
 import { HELP_CONTENT } from '../constants/helpContent';
 
@@ -44,7 +44,11 @@ const DEFAULT_INPUTS: APTInputs = {
   ppkEmployerRate: 1.5,
   vacationReserveRate: 8.3,
   additionalCosts: DEFAULT_ADDITIONAL_COSTS,
+  rateVariants: [],
 };
+
+// Maks. dodatkowych wariantów stawek (łącznie 4 kolumny w PDF: podstawowy + 3).
+const MAX_RATE_VARIANTS = 3;
 
 const SESSION_STORAGE_KEY = 'apt_calc_session';
 const SESSION_ADVANCED_KEY = 'apt_calc_advanced_expanded';
@@ -126,6 +130,11 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
     }
   });
 
+  // Sekcja wariantów rozwinięta domyślnie, jeśli jakieś warianty już istnieją.
+  const [variantsExpanded, setVariantsExpanded] = useState<boolean>(
+    () => (inputs.rateVariants?.length ?? 0) > 0
+  );
+
   useEffect(() => {
     sessionStorage.setItem(SESSION_ADVANCED_KEY, String(advancedExpanded));
   }, [advancedExpanded]);
@@ -172,6 +181,36 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
     setInputs(prev => ({
       ...prev,
       additionalCosts: prev.additionalCosts.map(c => c.id === updatedCost.id ? updatedCost : c)
+    }));
+  };
+
+  const variants = inputs.rateVariants ?? [];
+
+  const addVariant = () => {
+    setInputs(prev => {
+      const current = prev.rateVariants ?? [];
+      if (current.length >= MAX_RATE_VARIANTS) return prev;
+      const newVariant: RateVariant = {
+        id: `var_${Date.now()}`,
+        label: `Wariant ${current.length + 2}`,      // podstawowy = "Wariant 1"
+        grossRateHourly: prev.grossRateHourly,        // pre-fill bieżącą stawką
+      };
+      return { ...prev, rateVariants: [...current, newVariant] };
+    });
+    setVariantsExpanded(true);
+  };
+
+  const updateVariant = (id: string, patch: Partial<RateVariant>) => {
+    setInputs(prev => ({
+      ...prev,
+      rateVariants: (prev.rateVariants ?? []).map(v => (v.id === id ? { ...v, ...patch } : v)),
+    }));
+  };
+
+  const removeVariant = (id: string) => {
+    setInputs(prev => ({
+      ...prev,
+      rateVariants: (prev.rateVariants ?? []).filter(v => v.id !== id),
     }));
   };
 
@@ -225,7 +264,8 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                       inputs.accidentInsuranceRate >= 0 &&
                       inputs.ppkEmployerRate >= 0 &&
                       inputs.vacationReserveRate >= 0 &&
-                      inputs.additionalCosts.every(cost => cost.amountPerPerson >= 0);
+                      inputs.additionalCosts.every(cost => cost.amountPerPerson >= 0) &&
+                      variants.every(v => v.grossRateHourly >= 0);
 
   const handleReset = () => {
     sessionStorage.removeItem(SESSION_STORAGE_KEY);
@@ -604,6 +644,84 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                 <CostRow key={cost.id} cost={cost} onChange={handleCostChange} />
               ))}
             </div>
+          </div>
+
+          {/* Warianty stawek (opcjonalne) — dodatkowe kolumny w PDF klienta */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div
+              className="flex items-center justify-between cursor-pointer select-none"
+              onClick={() => setVariantsExpanded(!variantsExpanded)}
+            >
+              <div className="flex items-center gap-2">
+                <Layers className="w-5 h-5 text-[#c0a068]" />
+                <h2 className="text-xl font-semibold">Warianty stawek</h2>
+                {variants.length > 0 && (
+                  <span className="text-xs bg-[#396542] text-white px-2 py-0.5 rounded-full">{variants.length}</span>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                {!variantsExpanded && (
+                  <span className="hidden md:block text-sm text-gray-500">
+                    {variants.length > 0 ? `${variants.length} dod. kolumn w PDF` : 'Opcjonalne (dzień / noc / weekend)'}
+                  </span>
+                )}
+                {variantsExpanded ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+              </div>
+            </div>
+
+            {variantsExpanded && (
+              <div className="mt-4 space-y-3">
+                <p className="text-sm text-gray-500">
+                  Alternatywne stawki brutto (np. zmiana noc, weekend). Każdy wariant pojawi się jako osobna
+                  kolumna w tabeli PDF dla klienta. Stawka podstawowa = „Wariant 1".
+                </p>
+                {variants.map((v, idx) => (
+                  <div key={v.id} className="flex items-end gap-3">
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Nazwa wariantu</label>
+                      <input
+                        type="text"
+                        value={v.label}
+                        onChange={(e) => updateVariant(v.id, { label: e.target.value })}
+                        placeholder={`Wariant ${idx + 2}`}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#396542] outline-none"
+                      />
+                    </div>
+                    <div className="w-32">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Stawka brutto / h</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={v.grossRateHourly}
+                        onChange={(e) => updateVariant(v.id, { grossRateHourly: toNumber(e.target.value) })}
+                        className={`w-full px-3 py-2 border ${v.grossRateHourly < 0 ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-[#396542] outline-none`}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeVariant(v.id)}
+                      className="mb-0.5 p-2 text-gray-400 hover:text-red-600 transition-colors"
+                      title="Usuń wariant"
+                      aria-label={`Usuń wariant ${v.label || idx + 2}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                {variants.length < MAX_RATE_VARIANTS ? (
+                  <button
+                    type="button"
+                    onClick={addVariant}
+                    className="flex items-center gap-2 text-sm font-semibold text-[#396542] hover:text-[#2c5034] transition-colors"
+                  >
+                    <Plus className="w-4 h-4" /> Dodaj wariant
+                  </button>
+                ) : (
+                  <p className="text-xs text-gray-400">Osiągnięto maksimum {MAX_RATE_VARIANTS} wariantów (4 kolumny w PDF).</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
