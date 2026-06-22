@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useAPTCalculation, calculateReverse, APTInputs, APTResults, AdditionalCost, Entity, ContractType, ContractorVariant, ViewMode } from '../hooks/useAPTCalculation';
+import { useAPTCalculation, calculateReverse, getMarginStatus, APTInputs, APTResults, AdditionalCost, Entity, ContractType, ContractorVariant, ViewMode, MarginStatus } from '../hooks/useAPTCalculation';
 import { CostRow, COST_ROW_LAYOUT_CLASSES } from './CostRow';
 import { Building2, FileText, Calculator, AlertTriangle, ChevronDown, ChevronUp, User, CalendarClock, Eye, Unlock } from 'lucide-react';
-import { MARGIN_THRESHOLD_RISK, MARGIN_THRESHOLD_HEALTHY } from '../constants/business';
 import { HelpPopover } from './HelpPopover';
 import { HELP_CONTENT } from '../constants/helpContent';
 
@@ -200,12 +199,14 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
     ? (results.marginAmount / results.baseMonthlyBilling) * 100
     : 0;
 
-  let marginHealthConfig = { label: 'Uwaga', color: 'bg-gradient-to-r from-amber-400 to-amber-600 text-white' };
-  if (marginOnSalesPercentage < MARGIN_THRESHOLD_RISK) {
-    marginHealthConfig = { label: 'Ryzyko', color: 'bg-gradient-to-r from-rose-400 to-rose-600 text-white' };
-  } else if (marginOnSalesPercentage > MARGIN_THRESHOLD_HEALTHY) {
-    marginHealthConfig = { label: 'Zdrowa', color: 'bg-gradient-to-r from-emerald-400 to-emerald-600 text-white' };
-  }
+  // Status marży z pojedynczego źródła (hook) — spójny z wizualizacją w PDF.
+  const marginStatus = getMarginStatus(marginOnSalesPercentage);
+  const STATUS_GRADIENT: Record<MarginStatus, string> = {
+    risk: 'bg-gradient-to-r from-rose-400 to-rose-600 text-white',
+    warning: 'bg-gradient-to-r from-amber-400 to-amber-600 text-white',
+    healthy: 'bg-gradient-to-r from-emerald-400 to-emerald-600 text-white',
+  };
+  const marginHealthConfig = { label: marginStatus.label, color: STATUS_GRADIENT[marginStatus.status] };
 
   // Listy kosztów dla widoku klienta (spójne z PDF: w stawce / refaktury / po stronie klienta).
   const inStawceCosts = inputs.additionalCosts.filter(

@@ -1,10 +1,12 @@
 import { useMemo } from 'react';
+import { MARGIN_THRESHOLD_RISK, MARGIN_THRESHOLD_HEALTHY } from '../constants/business';
 
 export type ContractType = 'Umowa zlecenie' | 'Praca tymczasowa';
 export type ContractorVariant = 'Standard ozusowany' | 'Student do 26 lat' | 'Zbieg tytułów - bez społecznych';
 export type CostMode = 'w_stawce' | 'refaktura_z_marza' | 'refaktura_1do1' | 'po_stronie_klienta';
 export type Entity = 'HR KONO S.A.' | 'APT WORK Sp. z o.o.' | 'Inny';
 export type ViewMode = 'internal' | 'client';
+export type MarginStatus = 'risk' | 'warning' | 'healthy';
 
 export interface AdditionalCost {
   id: string;
@@ -70,6 +72,35 @@ export interface APTResults {
 
 export const round2 = (num: number): number => {
   return Number(num.toFixed(2));
+};
+
+/**
+ * Status zdrowia marży względem progów ryzyka (od wartości sprzedaży).
+ * Pojedyncze źródło prawdy dla badge'a w panelu oraz wizualizacji w PDF.
+ * Progi: < RISK = ryzyko, [RISK, HEALTHY] = uwaga, > HEALTHY = zdrowa.
+ */
+export const getMarginStatus = (
+  marginPercentOnSales: number
+): { status: MarginStatus; label: string; advice: string } => {
+  if (marginPercentOnSales < MARGIN_THRESHOLD_RISK) {
+    return {
+      status: 'risk',
+      label: 'Ryzyko',
+      advice: `Marża poniżej progu ${MARGIN_THRESHOLD_RISK}% — kontrakt ryzykowny. Rozważ wyższą stawkę lub redukcję kosztów.`,
+    };
+  }
+  if (marginPercentOnSales <= MARGIN_THRESHOLD_HEALTHY) {
+    return {
+      status: 'warning',
+      label: 'Uwaga',
+      advice: `Marża w przedziale ${MARGIN_THRESHOLD_RISK}–${MARGIN_THRESHOLD_HEALTHY}% — akceptowalna, ale bez dużego buforu bezpieczeństwa.`,
+    };
+  }
+  return {
+    status: 'healthy',
+    label: 'Zdrowa',
+    advice: `Marża przekracza próg zdrowotny ${MARGIN_THRESHOLD_HEALTHY}% — kontrakt rentowny z bezpiecznym buforem operacyjnym.`,
+  };
 };
 
 export const calculateForward = (inputs: APTInputs): APTResults => {

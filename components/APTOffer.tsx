@@ -1,8 +1,16 @@
 import React from 'react';
 import { Printer } from 'lucide-react';
-import { APTInputs, APTResults, AdditionalCost, ViewMode } from '../hooks/useAPTCalculation';
+import { APTInputs, APTResults, AdditionalCost, ViewMode, MarginStatus, getMarginStatus } from '../hooks/useAPTCalculation';
+import { MARGIN_THRESHOLD_RISK, MARGIN_THRESHOLD_HEALTHY } from '../constants/business';
 import { PDFFooter } from './PDFFooter';
 import { PDFMainTable } from './PDFMainTable';
+
+// Wizualne mapowanie statusu marży (emoji + kolory) dla strony wewnętrznej.
+const MARGIN_STATUS_VIZ: Record<MarginStatus, { emoji: string; badge: string; row: string }> = {
+  risk: { emoji: '🔴', badge: 'bg-rose-100 text-rose-800 border-rose-300', row: 'bg-rose-50 font-bold' },
+  warning: { emoji: '⚠️', badge: 'bg-amber-100 text-amber-800 border-amber-300', row: 'bg-amber-50 font-bold' },
+  healthy: { emoji: '✅', badge: 'bg-emerald-100 text-emerald-800 border-emerald-300', row: 'bg-emerald-50 font-bold' },
+};
 
 interface Props {
   data: {
@@ -51,6 +59,9 @@ const APTOffer: React.FC<Props> = ({ data }) => {
     c => (c.mode === 'refaktura_z_marza' || c.mode === 'refaktura_1do1') && c.amountPerPerson > 0
   );
   const refakturaTotalBilled = results.refakturaZMarzaBilled + results.refaktura1to1Total;
+
+  // Status marży (od wartości sprzedaży = inputs.marginPercent) do wizualizacji w PDF wewn.
+  const marginStatus = getMarginStatus(inputs.marginPercent);
 
   // Miesięczna wartość refaktury fakturowana klientowi: z marżą dla z_marza, 1:1 dla 1do1.
   // Koszty jednorazowe amortyzowane na horyzont kontraktu (spójne z hookiem).
@@ -385,6 +396,45 @@ const APTOffer: React.FC<Props> = ({ data }) => {
             </div>
           </div>
         </div>
+        {/* Status marży względem progów ryzyka */}
+        <div className="mt-8">
+          <h2 className="text-lg font-bold mb-4 border-b border-gray-200 pb-2">Status marży względem progów ryzyka</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+            <table className="w-full text-sm border border-gray-200">
+              <thead className="bg-gray-50 text-gray-600">
+                <tr>
+                  <th className="py-2 px-3 text-left font-medium">Próg</th>
+                  <th className="py-2 px-3 text-right font-medium">Zakres</th>
+                  <th className="py-2 px-3 text-center font-medium">Twoja marża</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                <tr className={marginStatus.status === 'risk' ? MARGIN_STATUS_VIZ.risk.row : ''}>
+                  <td className="py-2 px-3">Ryzyko</td>
+                  <td className="py-2 px-3 text-right font-mono">&lt; {MARGIN_THRESHOLD_RISK}%</td>
+                  <td className="py-2 px-3 text-center">{marginStatus.status === 'risk' ? `${MARGIN_STATUS_VIZ.risk.emoji} ${inputs.marginPercent}%` : ''}</td>
+                </tr>
+                <tr className={marginStatus.status === 'warning' ? MARGIN_STATUS_VIZ.warning.row : ''}>
+                  <td className="py-2 px-3">Uwaga</td>
+                  <td className="py-2 px-3 text-right font-mono">{MARGIN_THRESHOLD_RISK}–{MARGIN_THRESHOLD_HEALTHY}%</td>
+                  <td className="py-2 px-3 text-center">{marginStatus.status === 'warning' ? `${MARGIN_STATUS_VIZ.warning.emoji} ${inputs.marginPercent}%` : ''}</td>
+                </tr>
+                <tr className={marginStatus.status === 'healthy' ? MARGIN_STATUS_VIZ.healthy.row : ''}>
+                  <td className="py-2 px-3">Zdrowa</td>
+                  <td className="py-2 px-3 text-right font-mono">&gt; {MARGIN_THRESHOLD_HEALTHY}%</td>
+                  <td className="py-2 px-3 text-center">{marginStatus.status === 'healthy' ? `${MARGIN_STATUS_VIZ.healthy.emoji} ${inputs.marginPercent}%` : ''}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div className={`border rounded-lg p-4 ${MARGIN_STATUS_VIZ[marginStatus.status].badge}`}>
+              <div className="font-bold mb-1">
+                {MARGIN_STATUS_VIZ[marginStatus.status].emoji} Marża {marginStatus.label} — {inputs.marginPercent}% od sprzedaży
+              </div>
+              <p className="text-sm leading-relaxed">{marginStatus.advice}</p>
+            </div>
+          </div>
+        </div>
+
         <PDFFooter variant="internal" preparedBy={inputs.preparedBy} />
       </div>
       )}
