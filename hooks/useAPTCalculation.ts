@@ -4,6 +4,7 @@ export type ContractType = 'Umowa zlecenie' | 'Praca tymczasowa';
 export type ContractorVariant = 'Standard ozusowany' | 'Student do 26 lat' | 'Zbieg tytułów - bez społecznych';
 export type CostMode = 'w_stawce' | 'refaktura_z_marza' | 'refaktura_1do1' | 'po_stronie_klienta';
 export type Entity = 'HR KONO S.A.' | 'APT WORK Sp. z o.o.' | 'Inny';
+export type ViewMode = 'internal' | 'client';
 
 export interface AdditionalCost {
   id: string;

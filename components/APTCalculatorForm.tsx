@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAPTCalculation, calculateReverse, APTInputs, APTResults, AdditionalCost, Entity, ContractType, ContractorVariant } from '../hooks/useAPTCalculation';
+import { useAPTCalculation, calculateReverse, APTInputs, APTResults, AdditionalCost, Entity, ContractType, ContractorVariant, ViewMode } from '../hooks/useAPTCalculation';
 import { CostRow, COST_ROW_LAYOUT_CLASSES } from './CostRow';
 import { Building2, FileText, Calculator, AlertTriangle, ChevronDown, ChevronUp, User, CalendarClock, Eye, Unlock } from 'lucide-react';
 import { MARGIN_THRESHOLD_RISK, MARGIN_THRESHOLD_HEALTHY } from '../constants/business';
@@ -17,7 +17,7 @@ const DEFAULT_ADDITIONAL_COSTS: AdditionalCost[] = [
 ];
 
 interface Props {
-  onGenerate: (data: { inputs: APTInputs, results: APTResults }) => void;
+  onGenerate: (data: { inputs: APTInputs, results: APTResults, viewMode: ViewMode }) => void;
   initialData?: { inputs: APTInputs, results: APTResults } | null;
 }
 
@@ -52,8 +52,6 @@ const SESSION_ADVANCED_KEY = 'apt_calc_advanced_expanded';
 const SESSION_PRICING_MODE_KEY = 'apt_calc_pricing_mode';
 const SESSION_VIEW_MODE_KEY = 'apt_calc_view_mode';
 const SESSION_VERSION = 1;
-
-export type ViewMode = 'internal' | 'client';
 
 const validateAPTInputs = (data: any): data is APTInputs => {
   if (!data || typeof data !== 'object') return false;
@@ -814,7 +812,7 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                 return (
                   <>
                     <button
-                      onClick={() => onGenerate({ inputs, results })}
+                      onClick={() => onGenerate({ inputs, results, viewMode })}
                       disabled={!isFormValid}
                       aria-disabled={!isFormValid}
                       aria-describedby={!isFormValid ? hintId : undefined}

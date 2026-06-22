@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import APTOffer from './components/APTOffer';
 import APTCalculatorForm from './components/APTCalculatorForm';
-import { APTInputs, APTResults } from './hooks/useAPTCalculation';
+import { APTInputs, APTResults, ViewMode } from './hooks/useAPTCalculation';
 
 export type CalculationData = {
   inputs: APTInputs;
   results: APTResults;
+  viewMode?: ViewMode;
 };
 
 const App: React.FC = () => {

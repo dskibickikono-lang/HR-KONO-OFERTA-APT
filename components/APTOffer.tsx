@@ -1,6 +1,6 @@
 import React from 'react';
 import { Printer } from 'lucide-react';
-import { APTInputs, APTResults, AdditionalCost } from '../hooks/useAPTCalculation';
+import { APTInputs, APTResults, AdditionalCost, ViewMode } from '../hooks/useAPTCalculation';
 import { PDFFooter } from './PDFFooter';
 import { PDFMainTable } from './PDFMainTable';
 
@@ -8,11 +8,12 @@ interface Props {
   data: {
     inputs: APTInputs;
     results: APTResults;
+    viewMode?: ViewMode;
   };
 }
 
 const APTOffer: React.FC<Props> = ({ data }) => {
-  const { inputs, results } = data;
+  const { inputs, results, viewMode } = data;
 
   // Horyzont amortyzacji kosztów jednorazowych (guard zgodny z hookiem).
   const horizon = inputs.contractHorizonMonths > 0 ? inputs.contractHorizonMonths : 1;
@@ -241,7 +242,8 @@ const APTOffer: React.FC<Props> = ({ data }) => {
         </div>
       </div>
 
-      {/* PAGE 2 — WEWNĘTRZNA / OPS */}
+      {/* PAGE 2 — WEWNĘTRZNA / OPS (pomijana w widoku klienta) */}
+      {viewMode !== 'client' && (
       <div className="print-page page-break max-w-4xl mx-auto p-8 my-8 bg-white shadow-lg border border-red-200">
         <div className="bg-red-50 text-red-800 p-4 rounded-lg mb-8 text-center border border-red-200">
           <h1 className="text-2xl font-bold">KALKULACJA TECHNICZNA — DOKUMENT WEWNĘTRZNY</h1>
@@ -385,6 +387,7 @@ const APTOffer: React.FC<Props> = ({ data }) => {
         </div>
         <PDFFooter variant="internal" preparedBy={inputs.preparedBy} />
       </div>
+      )}
     </div>
   );
 };
