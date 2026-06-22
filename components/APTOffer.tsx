@@ -1,6 +1,7 @@
 import React from 'react';
 import { Printer } from 'lucide-react';
 import { APTInputs, APTResults } from '../hooks/useAPTCalculation';
+import { PDFFooter } from './PDFFooter';
 
 interface Props {
   data: {
@@ -229,18 +230,7 @@ const APTOffer: React.FC<Props> = ({ data }) => {
           </div>
         )}
 
-        <div className="mt-16 pt-8 border-t border-gray-200 text-sm">
-          <p className="mb-8 font-medium">Termin płatności: 14 dni od daty wystawienia faktury</p>
-
-          <div className="flex justify-between mt-16">
-            <div className="w-64 border-t border-gray-400 text-center pt-2 text-gray-500">
-              data i podpis przedstawiciela Agencji
-            </div>
-            <div className="w-64 border-t border-gray-400 text-center pt-2 text-gray-500">
-              data i podpis Klienta
-            </div>
-          </div>
-        </div>
+        <PDFFooter variant="client" preparedBy={inputs.preparedBy} />
 
         <div className="mt-8 flex justify-center no-print">
           <button
@@ -394,6 +384,7 @@ const APTOffer: React.FC<Props> = ({ data }) => {
             </div>
           </div>
         </div>
+        <PDFFooter variant="internal" preparedBy={inputs.preparedBy} />
       </div>
     </div>
   );
