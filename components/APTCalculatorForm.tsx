@@ -167,13 +167,18 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
   const perRbh = (value: number) =>
     totalHours > 0 ? formatCurrency(value / totalHours) : '—';
 
-  const marginOfCostPercentage = results.agencyCost > 0 ? (results.marginAmount / results.agencyCost) * 100 : 0;
+  // Marża OD WARTOŚCI SPRZEDAŻY (model Gi Group): zysk / wartość faktury bazowej.
+  // Z definicji równa się wpisanej marginPercent, ale liczymy ją z wyników, aby badge
+  // nigdy nie rozjechał się z polem wejściowym ani z formułą billing = koszt / (1 - marża%).
+  const marginOnSalesPercentage = results.baseMonthlyBilling > 0
+    ? (results.marginAmount / results.baseMonthlyBilling) * 100
+    : 0;
 
-  let marginHealthConfig = { label: 'Uwaga', color: 'bg-yellow-500 text-black' };
-  if (marginOfCostPercentage < MARGIN_THRESHOLD_RISK) {
-    marginHealthConfig = { label: 'Ryzyko', color: 'bg-red-500 text-white' };
-  } else if (marginOfCostPercentage > MARGIN_THRESHOLD_HEALTHY) {
-    marginHealthConfig = { label: 'Zdrowa', color: 'bg-emerald-500 text-white' };
+  let marginHealthConfig = { label: 'Uwaga', color: 'bg-gradient-to-r from-amber-400 to-amber-600 text-white' };
+  if (marginOnSalesPercentage < MARGIN_THRESHOLD_RISK) {
+    marginHealthConfig = { label: 'Ryzyko', color: 'bg-gradient-to-r from-rose-400 to-rose-600 text-white' };
+  } else if (marginOnSalesPercentage > MARGIN_THRESHOLD_HEALTHY) {
+    marginHealthConfig = { label: 'Zdrowa', color: 'bg-gradient-to-r from-emerald-400 to-emerald-600 text-white' };
   }
 
   const isFormValid = inputs.workerCount >= 1 &&
@@ -390,7 +395,7 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
               )}
               <div>
                 <div className="flex items-center mb-1">
-                  <label className="block text-sm font-medium text-gray-700">Marża (od kosztu własnego) %</label>
+                  <label className="block text-sm font-medium text-gray-700">Marża brutto % — od wartości sprzedaży</label>
                   <HelpPopover title={HELP_CONTENT.marginPercent.title} content={HELP_CONTENT.marginPercent.content} />
                 </div>
                 <input
@@ -578,9 +583,9 @@ const APTCalculatorForm: React.FC<Props> = ({ onGenerate, initialData }) => {
                 </div>
                 <div className="flex justify-between items-center border-b border-white/10 pb-2">
                   <div className="flex flex-col">
-                    <span className="opacity-80 text-sm">Marża (od kosztu własnego)</span>
+                    <span className="opacity-80 text-sm">Marża brutto (od sprzedaży)</span>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xl font-bold text-white">{marginOfCostPercentage.toFixed(2)}%</span>
+                      <span className="text-xl font-bold text-white">{marginOnSalesPercentage.toFixed(2)}%</span>
                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider ${marginHealthConfig.color}`}>
                         {marginHealthConfig.label}
                       </span>

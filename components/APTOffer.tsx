@@ -349,15 +349,15 @@ const APTOffer: React.FC<Props> = ({ data }) => {
                 <h3 className="font-bold mb-4 text-[#396542]">MARŻA AGENCJI</h3>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Marża (od kosztu własnego) %</span>
+                    <span className="text-gray-600">Marża brutto (od sprzedaży) %</span>
                     <span className="font-bold">{inputs.marginPercent}%</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Marża (od kosztu własnego) zł/miesiąc</span>
+                    <span className="text-gray-600">Marża brutto (od sprzedaży) zł/miesiąc</span>
                     <span className="font-bold">{formatCurrency(results.marginAmount)}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Marża (od kosztu własnego) zł/rbh</span>
+                    <span className="text-gray-600">Marża brutto (od sprzedaży) zł/rbh</span>
                     <span className="font-bold text-lg text-[#396542]">{formatCurrency(results.marginPerHour)}</span>
                   </div>
                 </div>
