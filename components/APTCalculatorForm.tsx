@@ -12,7 +12,7 @@ const DEFAULT_ADDITIONAL_COSTS: AdditionalCost[] = [
   { id: 'legalizacja', label: 'Legalizacja / os.', amountPerPerson: 0, mode: 'refaktura_1do1', isPerMonth: false },
   { id: 'zakwaterowanie', label: 'Zakwaterowanie / os. / miesiąc', amountPerPerson: 700, mode: 'refaktura_1do1', isPerMonth: true },
   { id: 'transport', label: 'Transport / os. / miesiąc', amountPerPerson: 150, mode: 'refaktura_1do1', isPerMonth: true },
-  { id: 'koordynator', label: 'Koordynator projektu / miesiąc', amountPerPerson: 1000, mode: 'w_stawce', isPerMonth: true, isProjectLevel: true },
+  { id: 'koordynator', label: 'Koordynator projektu / miesiąc', amountPerPerson: 0, mode: 'w_stawce', isPerMonth: true, isProjectLevel: true },
 ];
 
 interface Props {
@@ -35,11 +35,11 @@ const DEFAULT_INPUTS: APTInputs = {
   validUntil: getDefaultValidUntil(),
   contractType: 'Umowa zlecenie',
   contractorVariant: 'Standard ozusowany',
-  workerCount: 1,
+  workerCount: 10,
   hoursPerMonth: 168,
   grossRateHourly: 31.40,
   marginPercent: 18,
-  contractHorizonMonths: 3,
+  contractHorizonMonths: 12,
   accidentInsuranceRate: 1.20,
   ppkEmployerRate: 1.5,
   vacationReserveRate: 8.3,
